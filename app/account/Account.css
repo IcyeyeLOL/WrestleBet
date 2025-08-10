@@ -1,0 +1,125 @@
+
+
+.btn-primary {
+    background: #ffc107;
+    color: #1a1d29;
+}
+
+.btn-primary:hover {
+    background: #e6ac00;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: rgba(45, 50, 80, 0.4);
+    padding: 1.5rem;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid rgba(255, 193, 7, 0.1);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #ffc107;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.bet-history {
+    background: rgba(45, 50, 80, 0.3);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.bet-item {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bet-item:last-child {
+    border-bottom: none;
+}
+
+.bet-info {
+    flex-grow: 1;
+}
+
+.bet-match {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.bet-details {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.bet-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-won {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.status-lost {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+}
+
+.status-pending {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+
+@media (max-width: 768px) {
+    .nav-links {
+        gap: 1rem;
+    }
+
+    .container {
+        padding: 1rem;
+    }
+
+    .page-title {
+        font-size: 2rem;
+    }
+
+    .tab-buttons {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
