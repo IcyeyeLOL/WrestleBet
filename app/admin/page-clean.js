@@ -38,7 +38,7 @@ export default function AdminPage() {
             <div className="mt-8 p-4 bg-green-500/20 rounded-lg border border-green-500/30">
               <h2 className="text-xl font-semibold text-white mb-2">🎉 {activePage.toUpperCase()} Section</h2>
               <p className="text-green-300 font-semibold">✅ Button clicks are working! Page state: {activePage}</p>
-              <p className="text-gray-300 mt-2">No more "Element type is invalid" errors!</p>
+              <p className="text-gray-300 mt-2">No more &quot;Element type is invalid&quot; errors!</p>
               <button 
                 onClick={() => setActivePage('dashboard')}
                 className="mt-4 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"

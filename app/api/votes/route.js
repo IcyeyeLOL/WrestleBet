@@ -1,4 +1,9 @@
 import { supabase } from '../../../lib/supabase'
+// Static export configuration for Next.js
+export const dynamic = 'force-static';
+export const revalidate = false;
+
+
 
 const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

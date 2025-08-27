@@ -1,6 +1,7 @@
 'use client';
 
 import StripeTestComponent from '../components/StripeTestComponent';
+import Link from 'next/link';
 
 export default function StripeTest() {
   return (
@@ -45,12 +46,12 @@ export default function StripeTest() {
         </div>
         
         <div className="mt-8 text-center">
-          <a 
+          <Link 
             href="/" 
             className="inline-block bg-yellow-400 text-black px-6 py-3 rounded-lg font-semibold hover:bg-yellow-300 transition-colors"
           >
             Back to App
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabase';
+// Static export configuration for Next.js
+export const dynamic = 'force-static';
+export const revalidate = false;
+
+
 
 // GET - Fetch users for admin management
 export async function GET(request) {

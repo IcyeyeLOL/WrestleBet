@@ -24,5 +24,5 @@ class SignInPage extends Component {
     );
   }
 }
-
 export default SignInPage;
+

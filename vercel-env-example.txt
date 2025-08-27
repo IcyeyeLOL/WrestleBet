@@ -1,0 +1,27 @@
+# Vercel Environment Variables
+# Copy these to your Vercel project dashboard under Settings > Environment Variables
+
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key_here
+
+# Supabase Database
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+
+# Stripe Payments
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key_here
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_stripe_webhook_secret_here
+
+# App Configuration
+NEXT_PUBLIC_APP_URL=https://your-app-name.vercel.app
+
+# Instructions:
+# 1. Go to your Vercel project dashboard
+# 2. Click on "Settings" tab
+# 3. Click on "Environment Variables" in the left sidebar
+# 4. Add each variable above with its corresponding value
+# 5. Make sure to set the correct environment (Production, Preview, Development)
+# 6. Redeploy your project after adding environment variables

@@ -1,5 +1,10 @@
 // Simplified API route for creating payment intents (for testing)
 import { NextResponse } from 'next/server';
+// Static export configuration for Next.js
+export const dynamic = 'force-static';
+export const revalidate = false;
+
+
 
 export async function POST(request) {
   try {

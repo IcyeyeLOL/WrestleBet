@@ -2,6 +2,11 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { headers } from 'next/headers';
+// Static export configuration for Next.js
+export const dynamic = 'force-static';
+export const revalidate = false;
+
+
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
