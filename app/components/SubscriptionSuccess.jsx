@@ -13,6 +13,7 @@ const SubscriptionSuccess = ({ donation, onClose }) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
         body: JSON.stringify({
           customerId: donation.customerId,
           returnUrl: window.location.href

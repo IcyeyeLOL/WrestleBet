@@ -29,7 +29,9 @@ const AdminSettings = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/admin/settings');
+      const response = await fetch('/api/admin/settings', {
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
       const data = await response.json();
       if (data.success) {
         setSettings(data.settings);
@@ -60,6 +62,7 @@ const AdminSettings = () => {
       const response = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
         body: JSON.stringify({
           settings: settingsToUpdate,
           adminUserId: 'admin-user-id' // This should come from auth context
@@ -93,6 +96,7 @@ const AdminSettings = () => {
       const response = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
         body: JSON.stringify({
           ...newSetting,
           adminUserId: 'admin-user-id'
@@ -132,7 +136,8 @@ const AdminSettings = () => {
 
     try {
       const response = await fetch(`/api/admin/settings?settingKey=${settingKey}&adminUserId=admin-user-id`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       const data = await response.json();

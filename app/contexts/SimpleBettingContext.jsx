@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import globalDataSync from '../lib/globalDataSync';
+import { safeFetch, isDemoMode, getDemoFallback } from '../lib/safeFetch';
 
 const BettingContext = createContext();
 
@@ -65,10 +66,10 @@ export const BettingProvider = ({ children }) => {
       setError(null);
       console.log('🌍 Loading global poll data from database...');
       
-      // Try to load from global database first
-      const response = await fetch('/api/votes');
-      if (response.ok) {
-        const data = await response.json();
+      // Try to load from global database first with safe fetch
+      const result = await safeFetch('/api/votes');
+      if (result.success) {
+        const data = result.data;
         console.log('📥 Global database response:', data);
         
         if (data.success && data.matches && Array.isArray(data.matches)) {
@@ -291,9 +292,8 @@ export const BettingProvider = ({ children }) => {
         if (realMatchId) {
           const userIp = await getUserIP();
           
-          const response = await fetch('/api/vote', {
+          const result = await safeFetch('/api/votes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               matchId: realMatchId,
               wrestlerChoice: actualWrestlerName,
@@ -301,8 +301,8 @@ export const BettingProvider = ({ children }) => {
             }),
           });
 
-          if (response.ok) {
-            const data = await response.json();
+          if (result.success) {
+            const data = result.data;
             console.log('✅ Global database sync successful:', data);
             
             // Update with actual database counts
@@ -416,9 +416,8 @@ export const BettingProvider = ({ children }) => {
       // Sync bet with global database
       try {
         const matchData = pollData[matchId];
-        const response = await fetch('/api/bets', {
+        const result = await safeFetch('/api/bets', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: 'anonymous-user', // In production, get from auth
             matchId: matchData?.matchId,
@@ -428,8 +427,8 @@ export const BettingProvider = ({ children }) => {
           }),
         });
 
-        if (response.ok) {
-          const data = await response.json();
+        if (result.success) {
+          const data = result.data;
           console.log('✅ Bet synced to global database:', data);
         } else {
           console.log('⚠️ Database bet sync failed, maintaining local state');
@@ -452,13 +451,12 @@ export const BettingProvider = ({ children }) => {
   // Helper function to sync betting pools to global database
   const syncBettingPoolsToGlobal = async (pools) => {
     try {
-      const response = await fetch('/api/betting-pools', {
+      const result = await safeFetch('/api/betting-pools', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pools }),
       });
 
-      if (response.ok) {
+      if (result.success) {
         console.log('✅ Betting pools synced to global database');
       } else {
         console.log('⚠️ Global pools sync failed, using localStorage backup');
@@ -563,11 +561,11 @@ export const BettingProvider = ({ children }) => {
       
       try {
         // First, try to load betting pools from global database
-        const poolsResponse = await fetch('/api/betting-pools');
+        const poolsResult = await safeFetch('/api/betting-pools');
         let initialPools = {};
         
-        if (poolsResponse.ok) {
-          const poolsData = await poolsResponse.json();
+        if (poolsResult.success) {
+          const poolsData = poolsResult.data;
           if (poolsData.success && poolsData.pools) {
             initialPools = poolsData.pools;
             console.log('📥 Loaded betting pools from global database:', initialPools);
@@ -628,9 +626,9 @@ export const BettingProvider = ({ children }) => {
         
         // Load stored bets from global database first
         try {
-          const betsResponse = await fetch('/api/bets');
-          if (betsResponse.ok && isMounted) {
-            const betsData = await betsResponse.json();
+          const betsResult = await safeFetch('/api/bets');
+          if (betsResult.success && isMounted) {
+            const betsData = betsResult.data;
             if (betsData.success && betsData.bets) {
               setBets(betsData.bets);
               updateBettingStats(betsData.bets);

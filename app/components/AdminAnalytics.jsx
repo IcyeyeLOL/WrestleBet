@@ -15,7 +15,9 @@ const AdminAnalytics = () => {
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/analytics?period=${period}&type=${activeTab}`);
+      const response = await fetch(`/api/admin/analytics?period=${period}&type=${activeTab}`, {
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
       const data = await response.json();
       if (data.success) {
         setAnalyticsData(data.data);

@@ -1,6 +1,8 @@
 // Global Data Synchronization System
 // Ensures all data is consistent across users, devices, and platforms
 
+import { safeFetch, isDemoMode, getDemoFallback } from './safeFetch.js';
+
 class GlobalDataSync {
   constructor() {
     this.storageKey = 'wrestlebet_global_data';
@@ -76,34 +78,37 @@ class GlobalDataSync {
   async syncWithServer() {
     if (!this.isOnline || this.syncInProgress) return false;
     
+    // Check if we're in demo mode
+    if (isDemoMode()) {
+      console.log('📱 Demo mode detected, skipping server sync');
+      return false;
+    }
+    
     this.syncInProgress = true;
     
     try {
-      // Sync matches
-      const matchesResponse = await fetch('/api/votes');
-      if (matchesResponse.ok) {
-        const matchesData = await matchesResponse.json();
-        if (matchesData.success && matchesData.matches) {
-          this.updateData('matches', matchesData.matches);
-        }
+      // Sync matches with safe fetch
+      const matchesResult = await safeFetch('/api/votes');
+      if (matchesResult.success && matchesResult.data?.matches) {
+        this.updateData('matches', matchesResult.data.matches);
+      } else {
+        console.log('⚠️ Matches sync failed, using local data');
       }
 
-      // Sync betting pools
-      const poolsResponse = await fetch('/api/betting-pools');
-      if (poolsResponse.ok) {
-        const poolsData = await poolsResponse.json();
-        if (poolsData.success && poolsData.pools) {
-          this.updateData('bettingPools', poolsData.pools);
-        }
+      // Sync betting pools with safe fetch
+      const poolsResult = await safeFetch('/api/betting-pools');
+      if (poolsResult.success && poolsResult.data?.pools) {
+        this.updateData('bettingPools', poolsResult.data.pools);
+      } else {
+        console.log('⚠️ Pools sync failed, using local data');
       }
 
-      // Sync bets
-      const betsResponse = await fetch('/api/bets');
-      if (betsResponse.ok) {
-        const betsData = await betsResponse.json();
-        if (betsData.success && betsData.bets) {
-          this.updateData('bets', betsData.bets);
-        }
+      // Sync bets with safe fetch
+      const betsResult = await safeFetch('/api/bets');
+      if (betsResult.success && betsResult.data?.bets) {
+        this.updateData('bets', betsResult.data.bets);
+      } else {
+        console.log('⚠️ Bets sync failed, using local data');
       }
 
       console.log('✅ Global data sync completed');
@@ -120,8 +125,10 @@ class GlobalDataSync {
   startAutoSync() {
     if (typeof window === 'undefined') return;
     
-    // Initial sync
-    this.syncWithServer();
+    // Wait a bit before starting sync to ensure the app is fully loaded
+    setTimeout(() => {
+      this.syncWithServer();
+    }, 2000);
     
     // Set up interval
     this.syncIntervalId = setInterval(() => {

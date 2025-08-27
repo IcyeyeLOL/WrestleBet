@@ -78,6 +78,7 @@ const StripeDonationForm = ({
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
         body: JSON.stringify({
           amount: parseFloat(amount),
           donationType,
@@ -156,6 +157,7 @@ const StripeDonationForm = ({
             headers: {
               'Content-Type': 'application/json',
             },
+            signal: AbortSignal.timeout(10000), // 10 second timeout
             body: JSON.stringify({
               paymentIntentId: paymentIntent.id
             }),

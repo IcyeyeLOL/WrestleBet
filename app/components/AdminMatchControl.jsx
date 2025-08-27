@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { safeFetch } from '../lib/safeFetch';
 
 const AdminMatchControl = () => {
   const [matches, setMatches] = useState([]);
@@ -27,8 +28,8 @@ const AdminMatchControl = () => {
         ? `/api/admin/matches?status=${selectedStatus}` 
         : '/api/admin/matches';
       
-      const response = await fetch(url);
-      if (!response.ok) {
+      const result = await safeFetch(url);
+      if (!result.success) {
         // Graceful fallback without throwing to avoid noisy console
         // Prefer local demo storage if present
         try {
@@ -44,7 +45,7 @@ const AdminMatchControl = () => {
         setLoading(false);
         return;
       }
-      const data = await response.json().catch(() => ({ success: false, error: 'Invalid JSON' }));
+      const data = result.data;
       
       const mergeWithLocal = (apiMatches = []) => {
         try {
@@ -140,18 +141,17 @@ const AdminMatchControl = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/admin/matches', {
+      const result = await safeFetch('/api/admin/matches', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           adminKey: 'wrestlebet-admin-2025'
         })
       });
 
-      const data = await response.json();
+      const data = result.data;
       // Persist locally in demo mode or if backend refused
-      if (!data.success) {
+      if (!result.success || !data.success) {
         console.warn('Creating match in demo mode (local only):', data.error);
       }
 
@@ -211,9 +211,8 @@ const AdminMatchControl = () => {
     const loadingToast = alert('⏳ Processing winner declaration and payouts...');
     
     try {
-      const response = await fetch('/api/admin/declare-winner', {
+      const result = await safeFetch('/api/admin/declare-winner', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           matchId, 
           winner, 
@@ -221,8 +220,8 @@ const AdminMatchControl = () => {
         })
       });
 
-      const data = await response.json();
-      if (data.success) {
+      const data = result.data;
+      if (result.success && data.success) {
         await loadMatches(); // Reload matches
         // Mark as completed in local demo storage and notify UI
         try {
@@ -284,12 +283,12 @@ const AdminMatchControl = () => {
 
       // Try API deletion for real matches
       const params = new URLSearchParams({ id: String(matchId), adminUserId: 'admin-user-id' });
-      const response = await fetch(`/api/admin/matches?${params.toString()}`, {
+      const result = await safeFetch(`/api/admin/matches?${params.toString()}`, {
         method: 'DELETE'
       });
 
-      const data = await response.json();
-      if (data.success) {
+      const data = result.data;
+      if (result.success && data.success) {
         // Remove from local demo storage as well (in case it was there)
         try {
           const stored = localStorage.getItem('admin_demo_matches');
@@ -323,7 +322,7 @@ const AdminMatchControl = () => {
           await loadMatches();
           alert('✅ Match deleted locally (API unavailable)!');
         } catch (localError) {
-          alert(`❌ Error: ${data.error}`);
+        alert(`❌ Error: ${data.error}`);
         }
       }
     } catch (error) {

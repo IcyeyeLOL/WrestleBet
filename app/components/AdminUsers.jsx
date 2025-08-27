@@ -24,7 +24,9 @@ const AdminUsers = () => {
         offset: pagination.offset.toString()
       });
 
-      const response = await fetch(`/api/admin/users?${params}`);
+      const response = await fetch(`/api/admin/users?${params}`, {
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
       const data = await response.json();
       if (data.success) {
         setUsers(data.users);
@@ -43,6 +45,7 @@ const AdminUsers = () => {
       const response = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
         body: JSON.stringify({
           id: userId,
           action,
@@ -79,7 +82,8 @@ const AdminUsers = () => {
     setActionLoading(true);
     try {
       const response = await fetch(`/api/admin/users?id=${userId}&adminUserId=admin-user-id&confirm=true`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       const data = await response.json();
