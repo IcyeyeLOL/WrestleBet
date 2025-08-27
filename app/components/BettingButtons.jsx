@@ -15,7 +15,8 @@ const BettingButtons = ({
 }) => {
   // Get wrestler key for odds lookup
   const getWrestlerKey = (wrestler) => {
-    return wrestler.toLowerCase().replace(/\s+/g, '').split(' ')[0];
+    if (!wrestler || typeof wrestler !== 'string') return '';
+    return wrestler.toLowerCase().trim().split(/\s+/)[0];
   };
 
   const wrestler1Key = getWrestlerKey(wrestler1);
@@ -37,16 +38,17 @@ const BettingButtons = ({
 
   return (
     <div className="flex flex-col md:flex-row gap-3 md:gap-4 w-full md:w-auto">
-      <div className="flex gap-3 md:gap-4">
+      <div className="flex gap-2 md:gap-4 w-full">
         <button 
           onClick={() => {
+            if (!wrestler1Key) return;
             handlePlaceBet(matchId, wrestler1Key, odds[matchId]?.[wrestler1Key] || '0.00');
           }}
-          className={`group/btn flex-1 md:flex-none relative overflow-hidden bg-gradient-to-r ${colors.wrestler1Bg} border ${colors.wrestler1Border} ${colors.wrestler1Text} hover:text-white px-5 py-3 rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg ${selectedVotes[matchId] === wrestler1Key ? 'ring-2 ring-yellow-400 bg-yellow-400/10' : ''}`}
+          className={`group/btn flex-1 md:flex-none relative overflow-hidden bg-gradient-to-r ${colors.wrestler1Bg} border ${colors.wrestler1Border} ${colors.wrestler1Text} hover:text-white px-3 md:px-5 py-4 md:py-3 rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg touch-manipulation min-h-[60px] md:min-h-[auto] ${selectedVotes[matchId] === wrestler1Key ? 'ring-2 ring-yellow-400 bg-yellow-400/10' : ''}`}
         >
           <div className="relative z-10 flex flex-col items-center">
-            <span className="text-sm md:text-base">{wrestler1.split(' ')[0]}</span>
-            <span className="text-lg md:text-xl font-black text-yellow-400">
+            <span className="text-sm md:text-base font-medium">{typeof wrestler1 === 'string' && wrestler1 ? wrestler1.split(' ')[0] : 'Blue'}</span>
+            <span className="text-lg md:text-xl font-black text-yellow-400 mt-1">
               {odds[matchId]?.[wrestler1Key] || '0.00'}
             </span>
           </div>
@@ -57,13 +59,14 @@ const BettingButtons = ({
         
         <button 
           onClick={() => {
+            if (!wrestler2Key) return;
             handlePlaceBet(matchId, wrestler2Key, odds[matchId]?.[wrestler2Key] || '0.00');
           }}
-          className={`group/btn flex-1 md:flex-none relative overflow-hidden bg-gradient-to-r ${colors.wrestler2Bg} border ${colors.wrestler2Border} ${colors.wrestler2Text} hover:text-white px-5 py-3 rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg ${selectedVotes[matchId] === wrestler2Key ? 'ring-2 ring-yellow-400 bg-yellow-400/10' : ''}`}
+          className={`group/btn flex-1 md:flex-none relative overflow-hidden bg-gradient-to-r ${colors.wrestler2Bg} border ${colors.wrestler2Border} ${colors.wrestler2Text} hover:text-white px-3 md:px-5 py-4 md:py-3 rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg touch-manipulation min-h-[60px] md:min-h-[auto] ${selectedVotes[matchId] === wrestler2Key ? 'ring-2 ring-yellow-400 bg-yellow-400/10' : ''}`}
         >
           <div className="relative z-10 flex flex-col items-center">
-            <span className="text-sm md:text-base">{wrestler2.split(' ')[0]}</span>
-            <span className="text-lg md:text-xl font-black text-yellow-400">
+            <span className="text-sm md:text-base font-medium">{typeof wrestler2 === 'string' && wrestler2 ? wrestler2.split(' ')[0] : 'Red'}</span>
+            <span className="text-lg md:text-xl font-black text-yellow-400 mt-1">
               {odds[matchId]?.[wrestler2Key] || '0.00'}
             </span>
           </div>

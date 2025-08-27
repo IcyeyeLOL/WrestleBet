@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 
-const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet }) => {
+const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet, onConfirmBet }) => {
   const { balance, getFormattedBalance, canAffordBet } = useCurrency();
   const [betAmount, setBetAmount] = useState('');
   const [error, setError] = useState('');
@@ -29,7 +29,10 @@ const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet }) 
       return;
     }
 
-    onPlaceBet(amount);
+    const submitHandler = onPlaceBet || onConfirmBet;
+    if (typeof submitHandler === 'function') {
+      submitHandler(amount);
+    }
     setBetAmount('');
     setError('');
     onClose();
@@ -48,8 +51,8 @@ const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet }) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-lg p-4 md:p-6 max-w-md w-full border border-gray-700 max-h-[90vh] overflow-y-auto">
         <div className="text-center mb-4">
           <h3 className="text-xl font-bold text-yellow-400 mb-2">Place Your Bet</h3>
           <p className="text-white">
@@ -69,15 +72,15 @@ const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet }) 
         {/* Quick Bet Buttons */}
         <div className="mb-4">
           <p className="text-gray-400 text-sm mb-2">Quick Bet:</p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {[10, 25, 50, 100].map((amount) => (
               <button
                 key={amount}
                 onClick={() => handleQuickBet(amount)}
                 disabled={!canAffordBet(amount)}
-                className={`py-2 px-3 rounded text-sm font-semibold transition-all ${
+                className={`py-3 md:py-2 px-3 rounded text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
                   canAffordBet(amount)
-                    ? 'bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400/30 border border-yellow-400/50'
+                    ? 'bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400/30 border border-yellow-400/50 active:bg-yellow-400/40'
                     : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-gray-600'
                 }`}
               >
@@ -120,16 +123,16 @@ const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet }) 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-3 px-4 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            className="flex-1 py-3 px-4 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors touch-manipulation min-h-[44px]"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors ${
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors touch-manipulation min-h-[44px] ${
               canSubmit
-                ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+                ? 'bg-yellow-400 text-black hover:bg-yellow-500 active:bg-yellow-600'
                 : 'bg-gray-600 text-gray-400 cursor-not-allowed'
             }`}
           >

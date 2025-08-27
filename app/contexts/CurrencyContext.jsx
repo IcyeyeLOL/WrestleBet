@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import globalDataSync from '../lib/globalDataSync';
 
 const CurrencyContext = createContext();
 
@@ -22,35 +23,93 @@ export const CurrencyProvider = ({ children }) => {
   const [balance, setBalance] = useState(STARTING_BALANCE);
   const [lastBonusTime, setLastBonusTime] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState([]);
 
-  // Load initial balance and bonus data from localStorage
+  // Load initial balance and bonus data from global sync
   useEffect(() => {
-    const storedBalance = localStorage.getItem('wrestlecoins_balance');
-    if (storedBalance) {
-      setBalance(parseFloat(storedBalance));
+    // Try to get from global sync first
+    const globalData = globalDataSync.getData('currency');
+    
+    if (globalData.balance !== undefined) {
+      setBalance(globalData.balance);
+    } else {
+      // Fallback to localStorage
+      const storedBalance = localStorage.getItem('wrestlecoins_balance');
+      if (storedBalance) {
+        setBalance(parseFloat(storedBalance));
+      }
     }
     
-    const storedBonusTime = localStorage.getItem('wrestlecoins_last_bonus');
-    if (storedBonusTime) {
-      setLastBonusTime(new Date(storedBonusTime));
+    if (globalData.lastBonusTime) {
+      setLastBonusTime(new Date(globalData.lastBonusTime));
+    } else {
+      // Fallback to localStorage
+      const storedBonusTime = localStorage.getItem('wrestlecoins_last_bonus');
+      if (storedBonusTime) {
+        setLastBonusTime(new Date(storedBonusTime));
+      }
+    }
+
+    // Load transactions
+    if (globalData.transactions && Array.isArray(globalData.transactions)) {
+      setTransactions(globalData.transactions);
+    } else {
+      // Fallback to localStorage
+      const storedTx = localStorage.getItem('wrestlecoins_transactions');
+      if (storedTx) {
+        try {
+          const parsed = JSON.parse(storedTx);
+          if (Array.isArray(parsed)) setTransactions(parsed);
+        } catch {}
+      }
     }
     
     setLoading(false);
   }, []);
 
   // Enhanced balance addition with precision
-  const addToBalance = useCallback((amount) => {
+  const addToBalance = useCallback((amount, description = 'Balance credit') => {
     const preciseAmount = preciseCurrencyCalculation(amount);
     
     setBalance(prevBalance => {
       const newBalance = updateBalanceWithPrecision(prevBalance, preciseAmount);
       localStorage.setItem('wrestlecoins_balance', newBalance.toString());
+      
+      // Update global sync
+      const globalData = globalDataSync.getData('currency');
+      globalDataSync.updateData('currency', {
+        ...globalData,
+        balance: newBalance
+      });
+      
       return newBalance;
+    });
+
+    // Record transaction
+    setTransactions(prev => {
+      const tx = {
+        id: `tx_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+        type: 'credit',
+        amount: preciseAmount,
+        description,
+        timestamp: new Date().toISOString(),
+      };
+      const updated = [...prev, tx];
+      localStorage.setItem('wrestlecoins_transactions', JSON.stringify(updated));
+      
+      // Update global sync
+      const globalData = globalDataSync.getData('currency');
+      globalDataSync.updateData('currency', {
+        ...globalData,
+        transactions: updated
+      });
+      
+      return updated;
     });
   }, []);
 
   // Enhanced balance subtraction with validation
-  const subtractFromBalance = useCallback((amount) => {
+  const subtractFromBalance = useCallback((amount, description = 'Balance debit') => {
     const preciseAmount = preciseCurrencyCalculation(amount);
     
     setBalance(prevBalance => {
@@ -74,6 +133,20 @@ export const CurrencyProvider = ({ children }) => {
       localStorage.setItem('wrestlecoins_balance', newBalance.toString());
       return newBalance;
     });
+
+    // Record transaction
+    setTransactions(prev => {
+      const tx = {
+        id: `tx_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+        type: 'debit',
+        amount: preciseAmount,
+        description,
+        timestamp: new Date().toISOString(),
+      };
+      const updated = [...prev, tx];
+      localStorage.setItem('wrestlecoins_transactions', JSON.stringify(updated));
+      return updated;
+    });
   }, []);
 
   // Add getFormattedBalance function
@@ -86,6 +159,14 @@ export const CurrencyProvider = ({ children }) => {
     if (balance <= 50) return 'critical';
     if (balance <= 200) return 'low';
     return 'normal';
+  }, [balance]);
+
+  // Helper: can the user afford a given bet amount?
+  const canAffordBet = useCallback((amount) => {
+    const preciseAmount = preciseCurrencyCalculation(amount || 0);
+    if (preciseAmount < 10) return false;
+    if (preciseAmount > 10000) return false;
+    return balance >= preciseAmount;
   }, [balance]);
 
   // Daily bonus functions
@@ -121,7 +202,7 @@ export const CurrencyProvider = ({ children }) => {
     }
     
     const now = new Date();
-    addToBalance(DAILY_BONUS_AMOUNT);
+    addToBalance(DAILY_BONUS_AMOUNT, 'Daily bonus');
     setLastBonusTime(now);
     localStorage.setItem('wrestlecoins_last_bonus', now.toISOString());
     
@@ -135,8 +216,10 @@ export const CurrencyProvider = ({ children }) => {
     subtractFromBalance,
     getFormattedBalance,
     getBalanceStatus,
+    canAffordBet,
     loading,
     lastBonusTime,
+    transactions,
     DAILY_BONUS_AMOUNT,
     preciseCurrencyCalculation,
     updateBalanceWithPrecision,

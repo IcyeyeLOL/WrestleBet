@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import globalDataSync from '../lib/globalDataSync';
 
 const BettingContext = createContext();
 
@@ -30,23 +31,11 @@ export const BettingProvider = ({ children }) => {
     winRate: 0
   });
 
-  const getFallbackData = () => ({
-    'taylor-yazdani': {
-      taylor: 7,
-      yazdani: 3,
-      totalVotes: 10
-    },
-    'dake-punia': {
-      dake: 4,
-      punia: 8,
-      totalVotes: 12
-    },
-    'steveson-petriashvili': {
-      steveson: 2,
-      petriashvili: 5,
-      totalVotes: 7
-    }
-  });
+  const getFallbackData = () => {
+    // Use global data sync system
+    const globalData = globalDataSync.getData('matches');
+    return globalData || {};
+  };
 
   // ADD THIS FUNCTION HERE (after getFallbackData)
   const getBalanceStatus = (userId = 'default') => {
@@ -83,42 +72,82 @@ export const BettingProvider = ({ children }) => {
         console.log('📥 Global database response:', data);
         
         if (data.success && data.matches && Array.isArray(data.matches)) {
-          const newPollData = {};
+          let newPollData = {};
           
           data.matches.forEach(match => {
-            // Create match keys that match frontend expectations
-            let matchKey;
-            if (match.wrestler1 === 'David Taylor' && match.wrestler2 === 'Hassan Yazdani') {
-              matchKey = 'taylor-yazdani';
-            } else if (match.wrestler1 === 'Kyle Dake' && match.wrestler2 === 'Bajrang Punia') {
-              matchKey = 'dake-punia';
-            } else if (match.wrestler1 === 'Gable Steveson' && match.wrestler2 === 'Geno Petriashvili') {
-              matchKey = 'steveson-petriashvili';
-            } else {
-              const wrestler1 = match.wrestler1.toLowerCase().replace(/\s+/g, '');
-              const wrestler2 = match.wrestler2.toLowerCase().replace(/\s+/g, '');
-              matchKey = `${wrestler1}-${wrestler2}`;
-            }
+            // Generate dynamic match key from wrestler names
+            const wrestler1 = match.wrestler1?.toLowerCase().replace(/\s+/g, '') || 'wrestler1';
+            const wrestler2 = match.wrestler2?.toLowerCase().replace(/\s+/g, '') || 'wrestler2';
+            const matchKey = `${wrestler1}-${wrestler2}`;
             
             const voteCounts = match.voteCounts || {};
+            const wrestler1Key = wrestler1.split(' ')[0];
+            const wrestler2Key = wrestler2.split(' ')[0];
+            
             newPollData[matchKey] = {
               ...voteCounts,
-              taylor: voteCounts['David Taylor'] || 0,
-              yazdani: voteCounts['Hassan Yazdani'] || 0,
-              dake: voteCounts['Kyle Dake'] || 0,
-              punia: voteCounts['Bajrang Punia'] || 0,
-              steveson: voteCounts['Gable Steveson'] || 0,
-              petriashvili: voteCounts['Geno Petriashvili'] || 0,
+              [wrestler1Key]: voteCounts[match.wrestler1] || 0,
+              [wrestler2Key]: voteCounts[match.wrestler2] || 0,
               totalVotes: match.totalVotes || 0,
               matchId: match.id,
               wrestler1: match.wrestler1,
               wrestler2: match.wrestler2
             };
           });
+
+          // Merge locally created admin demo matches so front page reflects admin control in demo/offline mode
+          try {
+            const storedAdmin = localStorage.getItem('admin_demo_matches');
+            if (storedAdmin) {
+              const adminMatches = JSON.parse(storedAdmin);
+              if (Array.isArray(adminMatches)) {
+                adminMatches.forEach(m => {
+                  const wrestler1 = m.wrestler1?.toLowerCase().replace(/\s+/g, '') || 'wrestler1';
+                  const wrestler2 = m.wrestler2?.toLowerCase().replace(/\s+/g, '') || 'wrestler2';
+                  const key = m.id || `${wrestler1}-${wrestler2}`;
+                  
+                  if (!newPollData[key]) {
+                    const wrestler1Key = wrestler1.split(' ')[0];
+                    const wrestler2Key = wrestler2.split(' ')[0];
+                    
+                    newPollData[key] = {
+                      [wrestler1Key]: 0,
+                      [wrestler2Key]: 0,
+                      totalVotes: 0,
+                      wrestler1: m.wrestler1,
+                      wrestler2: m.wrestler2,
+                      matchId: m.id
+                    };
+                  }
+                });
+              }
+            }
+          } catch {}
           
           console.log('✅ Loaded global poll data:', newPollData);
           setPollData(newPollData);
-          calculateOdds(newPollData, bettingPools);
+          
+          // Store in global sync system for consistency
+          globalDataSync.updateData('matches', newPollData);
+          
+          // Ensure pools exist for any newly merged matches
+          setBettingPools(prev => {
+            const updated = { ...prev };
+            Object.keys(newPollData).forEach((k, index) => {
+              if (!updated[k]) {
+                // Initialize new matches with equal 50-50 pools
+                updated[k] = { 
+                  wrestler1: 100, 
+                  wrestler2: 100 
+                };
+                console.log(`🎯 Initialized NEW MATCH pools for ${k} at 50-50:`, updated[k]);
+              }
+            });
+            return updated;
+          });
+          calculateOdds(newPollData, {
+            ...bettingPools,
+          });
           return;
         }
       }
@@ -154,24 +183,13 @@ export const BettingProvider = ({ children }) => {
       if (pools && pools[matchKey] && (pools[matchKey].wrestler1 > 0 || pools[matchKey].wrestler2 > 0)) {
         const totalWC = pools[matchKey].wrestler1 + pools[matchKey].wrestler2;
         console.log(`💰 Using WC-based odds for ${matchKey}, total WC: ${totalWC}`);
-        
-        // Calculate odds for each wrestler based on their betting pool position
-        if (matchKey === 'taylor-yazdani') {
-          const taylorWC = pools[matchKey].wrestler1;
-          const yazdaniWC = pools[matchKey].wrestler2;
-          newOdds[matchKey]['taylor'] = taylorWC > 0 ? Math.max(1.10, (totalWC / taylorWC)).toFixed(2) : '10.00';
-          newOdds[matchKey]['yazdani'] = yazdaniWC > 0 ? Math.max(1.10, (totalWC / yazdaniWC)).toFixed(2) : '10.00';
-        } else if (matchKey === 'dake-punia') {
-          const dakeWC = pools[matchKey].wrestler1;
-          const puniaWC = pools[matchKey].wrestler2;
-          newOdds[matchKey]['dake'] = dakeWC > 0 ? Math.max(1.10, (totalWC / dakeWC)).toFixed(2) : '10.00';
-          newOdds[matchKey]['punia'] = puniaWC > 0 ? Math.max(1.10, (totalWC / puniaWC)).toFixed(2) : '10.00';
-        } else if (matchKey === 'steveson-petriashvili') {
-          const stevesonWC = pools[matchKey].wrestler1;
-          const petriashviliWC = pools[matchKey].wrestler2;
-          newOdds[matchKey]['steveson'] = stevesonWC > 0 ? Math.max(1.10, (totalWC / stevesonWC)).toFixed(2) : '10.00';
-          newOdds[matchKey]['petriashvili'] = petriashviliWC > 0 ? Math.max(1.10, (totalWC / petriashviliWC)).toFixed(2) : '10.00';
-        }
+        // Generic mapping for any match using first token keys
+        const key1 = (matchData.wrestler1 || 'w1').toLowerCase().split(' ')[0];
+        const key2 = (matchData.wrestler2 || 'w2').toLowerCase().split(' ')[0];
+        const w1WC = pools[matchKey].wrestler1;
+        const w2WC = pools[matchKey].wrestler2;
+        newOdds[matchKey][key1] = w1WC > 0 ? Math.max(1.10, (totalWC / w1WC)).toFixed(2) : '10.00';
+        newOdds[matchKey][key2] = w2WC > 0 ? Math.max(1.10, (totalWC / w2WC)).toFixed(2) : '10.00';
         
         console.log(`✅ WC-based odds for ${matchKey}:`, newOdds[matchKey]);
       } else {
@@ -345,14 +363,23 @@ export const BettingProvider = ({ children }) => {
           updatedPools[matchId] = { wrestler1: 0, wrestler2: 0 };
         }
         
-        // Determine wrestler position for pool tracking
+        // Determine wrestler position for pool tracking dynamically
         let wrestlerPosition = 'wrestler1';
-        if (matchId === 'taylor-yazdani') {
-          wrestlerPosition = wrestler === 'taylor' ? 'wrestler1' : 'wrestler2';
-        } else if (matchId === 'dake-punia') {
-          wrestlerPosition = wrestler === 'dake' ? 'wrestler1' : 'wrestler2';
-        } else if (matchId === 'steveson-petriashvili') {
-          wrestlerPosition = wrestler === 'steveson' ? 'wrestler1' : 'wrestler2';
+        const matchData = pollData[matchId];
+        if (matchData) {
+          const wrestler1FirstName = matchData.wrestler1?.toLowerCase().split(' ')[0] || '';
+          const wrestler2FirstName = matchData.wrestler2?.toLowerCase().split(' ')[0] || '';
+          const wrestlerKey = wrestler.toLowerCase().trim();
+          
+          if (wrestlerKey === wrestler1FirstName) {
+            wrestlerPosition = 'wrestler1';
+          } else if (wrestlerKey === wrestler2FirstName) {
+            wrestlerPosition = 'wrestler2';
+          } else {
+            // Fallback: use hash-based assignment
+            const hash = wrestlerKey.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+            wrestlerPosition = hash % 2 === 0 ? 'wrestler1' : 'wrestler2';
+          }
         }
         
         updatedPools[matchId][wrestlerPosition] += betAmount;
@@ -365,13 +392,15 @@ export const BettingProvider = ({ children }) => {
           const wrestler1Odds = matchPools.wrestler1 > 0 ? Math.max(1.10, (totalPoolWC / matchPools.wrestler1)).toFixed(2) : '10.00';
           const wrestler2Odds = matchPools.wrestler2 > 0 ? Math.max(1.10, (totalPoolWC / matchPools.wrestler2)).toFixed(2) : '10.00';
           
+          // Generate dynamic odds based on wrestler names
           let newOdds = {};
-          if (matchId === 'taylor-yazdani') {
-            newOdds = { taylor: wrestler1Odds, yazdani: wrestler2Odds };
-          } else if (matchId === 'dake-punia') {
-            newOdds = { dake: wrestler1Odds, punia: wrestler2Odds };
-          } else if (matchId === 'steveson-petriashvili') {
-            newOdds = { steveson: wrestler1Odds, petriashvili: wrestler2Odds };
+          if (matchData) {
+            const wrestler1FirstName = matchData.wrestler1?.toLowerCase().split(' ')[0] || 'wrestler1';
+            const wrestler2FirstName = matchData.wrestler2?.toLowerCase().split(' ')[0] || 'wrestler2';
+            newOdds = { 
+              [wrestler1FirstName]: wrestler1Odds, 
+              [wrestler2FirstName]: wrestler2Odds 
+            };
           }
           
           setOdds(prev => ({ ...prev, [matchId]: newOdds }));
@@ -475,11 +504,11 @@ export const BettingProvider = ({ children }) => {
     const currentMatches = Object.keys(pollData);
     const resetPools = {};
     
-    // Reset each match to equal pools
-    currentMatches.forEach(matchKey => {
+    // Reset each match to equal 50-50 pools
+    currentMatches.forEach((matchKey, index) => {
       resetPools[matchKey] = { 
-        wrestler1: 50, 
-        wrestler2: 50 
+        wrestler1: 100, 
+        wrestler2: 100 
       };
     });
     
@@ -559,12 +588,19 @@ export const BettingProvider = ({ children }) => {
         
         // Initialize with default pools if none exist
         if (Object.keys(initialPools).length === 0) {
-          initialPools = {
-            'taylor-yazdani': { wrestler1: 100, wrestler2: 50 }, // Taylor: 100 WC, Yazdani: 50 WC
-            'dake-punia': { wrestler1: 75, wrestler2: 125 },     // Dake: 75 WC, Punia: 125 WC
-            'steveson-petriashvili': { wrestler1: 30, wrestler2: 80 } // Steveson: 30 WC, Petriashvili: 80 WC
-          };
-          console.log('🎯 Initialized default betting pools:', initialPools);
+          // Get matches from global sync system to create pools dynamically
+          const globalMatches = globalDataSync.getData('matches');
+          initialPools = {};
+          
+          Object.keys(globalMatches).forEach((matchKey, index) => {
+            // Initialize new matches with equal 50-50 pools
+            initialPools[matchKey] = { 
+              wrestler1: 100, 
+              wrestler2: 100 
+            };
+          });
+          
+          console.log('🎯 Initialized NEW MATCH pools at 50-50:', initialPools);
           
           // Sync initial pools to global database only if component is still mounted
           if (isMounted) {
@@ -586,16 +622,8 @@ export const BettingProvider = ({ children }) => {
           setBettingPools(initialPools);
           console.log('✅ Set bettingPools state to:', initialPools);
           
-          // Load poll data and calculate odds with the betting pools
+          // Load poll data (which internally calculates odds using current pools)
           await loadPollData();
-          
-          // Recalculate odds with the loaded pools after poll data is loaded
-          setTimeout(() => {
-            if (isMounted) {
-              console.log('🔄 Recalculating odds with pools:', initialPools);
-              calculateOdds(getFallbackData(), initialPools);
-            }
-          }, 100);
         }
         
         // Load stored bets from global database first
@@ -643,10 +671,75 @@ export const BettingProvider = ({ children }) => {
     };
     
     loadInitialData();
+
+    // Start global data sync
+    globalDataSync.startAutoSync();
+
+    // Periodically refresh poll data to sync with admin updates
+    const intervalId = setInterval(() => {
+      if (isMounted) {
+        loadPollData();
+      }
+    }, 15000); // every 15s
+
+    // Listen for admin-created matches to refresh immediately
+    const onAdminCreated = () => {
+      if (isMounted) {
+        loadPollData();
+      }
+    };
+    const onAdminDeleted = (e) => {
+      if (!isMounted) return;
+      const matchId = e?.detail?.matchId;
+      setPollData(prev => {
+        const copy = { ...prev };
+        // Find by matchId or key
+        Object.keys(copy).forEach(k => {
+          if (k === matchId || copy[k]?.matchId === matchId) delete copy[k];
+        });
+        return copy;
+      });
+      setOdds(prev => {
+        const copy = { ...prev };
+        Object.keys(copy).forEach(k => {
+          if (k === matchId) delete copy[k];
+        });
+        return copy;
+      });
+      setBettingPools(prev => {
+        const copy = { ...prev };
+        Object.keys(copy).forEach(k => {
+          if (k === matchId) delete copy[k];
+        });
+        return copy;
+      });
+    };
+    const onAdminWinner = (e) => {
+      if (!isMounted) return;
+      const { matchId, winner } = e?.detail || {};
+      if (!matchId || !winner) return;
+      // Map winner to key tokens
+      const winnerKey = winner.toLowerCase().split(' ')[0];
+      declareMatchWinner(matchId, winnerKey);
+      // Optionally remove or mark completed
+      setPollData(prev => ({ ...prev }));
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('admin-match-created', onAdminCreated);
+      window.addEventListener('admin-match-deleted', onAdminDeleted);
+      window.addEventListener('admin-declare-winner', onAdminWinner);
+    }
     
     // Cleanup function to prevent state updates on unmounted component
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
+      globalDataSync.stopAutoSync();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('admin-match-created', onAdminCreated);
+        window.removeEventListener('admin-match-deleted', onAdminDeleted);
+        window.removeEventListener('admin-declare-winner', onAdminWinner);
+      }
     };
   }, []);
 

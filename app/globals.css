@@ -24,3 +24,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Utility to remove any low-opacity glow/shadow outlines inside a container */
+.no-glow, .no-glow *::before, .no-glow *::after, .no-glow * {
+  box-shadow: none !important;
+  outline: none !important;
+}

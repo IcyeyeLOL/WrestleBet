@@ -1,11 +1,36 @@
 import { supabase } from '../../../lib/supabase'
 
+const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Merge admin-demo matches from localStorage via cookie-less approach is not possible on server.
+// To allow quick demo sync, also read from an in-memory env var string if provided.
+// Developers can set NEXT_PUBLIC_ADMIN_DEMO_MATCHES with JSON array.
+const demoMatchesBase = [];
+
+const getDemoMatches = () => {
+  try {
+    const injected = process.env.NEXT_PUBLIC_ADMIN_DEMO_MATCHES;
+    if (injected) {
+      const parsed = JSON.parse(injected);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return demoMatchesBase;
+};
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const matchId = searchParams.get('matchId')
 
     if (matchId) {
+      if (!supabaseConfigured) {
+        const match = getDemoMatches().find(m => m.id === matchId);
+        if (!match) {
+          return Response.json({ success: false, error: 'Not found' }, { status: 404 })
+        }
+        return Response.json({ success: true, votes: match.voteCounts, totalVotes: match.totalVotes })
+      }
       // Get votes for specific match
       const { data: votes, error } = await supabase
         .from('votes')
@@ -26,6 +51,9 @@ export async function GET(request) {
         totalVotes: votes.length
       })
     } else {
+      if (!supabaseConfigured) {
+        return Response.json({ success: true, matches: getDemoMatches() })
+      }
       // Get all matches with vote counts
       const { data: matches, error } = await supabase
         .from('matches')

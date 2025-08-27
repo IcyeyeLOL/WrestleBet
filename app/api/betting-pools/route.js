@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 
 // In-memory storage for betting pools (in production, use a database)
-let globalBettingPools = {
-  'taylor-yazdani': { wrestler1: 100, wrestler2: 50 },    // Taylor: 100 WC, Yazdani: 50 WC
-  'dake-punia': { wrestler1: 75, wrestler2: 125 },       // Dake: 75 WC, Punia: 125 WC
-  'steveson-petriashvili': { wrestler1: 30, wrestler2: 80 } // Steveson: 30 WC, Petriashvili: 80 WC
-};
+// Start with empty pools so new matches get initialized with 50-50
+let globalBettingPools = {};
 
 // GET - Retrieve current betting pools
 export async function GET() {

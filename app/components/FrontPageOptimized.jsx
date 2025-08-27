@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 
 // Import contexts
@@ -21,6 +22,7 @@ import '../styles/mobile.css';
 // import type { BettingModalState, AuthModalState } from '../types';
 
 const FrontPageOptimized = () => {
+  const router = useRouter();
   // Contexts
   const { 
     selectedVotes, 
@@ -35,7 +37,7 @@ const FrontPageOptimized = () => {
   
   const { 
     balance, 
-    deductBalance, 
+    subtractFromBalance, 
     getFormattedBalance 
   } = useCurrency();
 
@@ -78,15 +80,64 @@ const FrontPageOptimized = () => {
     }
   }, []);
 
+  // Hidden admin access
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const navigateIfMatch = (value) => {
+      if (value === 'Icyeye21!') {
+        router.push('/admin');
+      }
+    };
+
+    const checkHash = () => {
+      const hash = window.location.hash || '';
+      const [, val] = hash.replace('#', '').split('ak=');
+      if (val) navigateIfMatch(decodeURIComponent(val));
+    };
+
+    let aTapCount = 0;
+    let aTapTimer = null;
+
+    const onKeyDown = (e) => {
+      // Alt+Shift+A or Alt+Shift+I to open prompt (avoids browser Ctrl+Shift+A conflict)
+      const isAltShift = e.altKey && e.shiftKey && (e.key === 'A' || e.key === 'a' || e.key === 'I' || e.key === 'i');
+      if (isAltShift) {
+        const input = window.prompt('Enter access key');
+        if (input) navigateIfMatch(input.trim());
+        return;
+      }
+
+      // Triple tap 'a' quickly to open prompt (no modifiers)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+        aTapCount += 1;
+        clearTimeout(aTapTimer);
+        if (aTapCount >= 3) {
+          aTapCount = 0;
+          const input = window.prompt('Enter access key');
+          if (input) navigateIfMatch(input.trim());
+        } else {
+          aTapTimer = setTimeout(() => { aTapCount = 0; }, 800);
+        }
+      }
+    };
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('hashchange', checkHash);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [router]);
+
   // Memoized utility functions for better performance
   const utilityFunctions = useMemo(() => ({
     getPercentage: (matchId, wrestler) => {
       console.log(`🔍 getPercentage called for ${matchId} - ${wrestler}`);
       
-      // Fallback values
-      const fallbackValue = matchId === 'taylor-yazdani' ? (wrestler === 'taylor' ? 67 : 33) : 
-                            matchId === 'dake-punia' ? (wrestler === 'dake' ? 38 : 62) :
-                            matchId === 'steveson-petriashvili' ? (wrestler === 'steveson' ? 27 : 73) : 50;
+      // Default fallback value
+      const fallbackValue = 50;
       
       if (!bettingPools || Object.keys(bettingPools).length === 0 || !bettingPools[matchId]) {
         return fallbackValue;
@@ -104,29 +155,69 @@ const FrontPageOptimized = () => {
         return fallbackValue;
       }
       
-      // Dynamic wrestler mapping
+      // Determine which wrestler this is based on the wrestler key
       let wrestlerWC = 0;
-      const wrestler1Name = matchData.wrestler1?.toLowerCase().replace(/\s+/g, '');
-      const wrestler2Name = matchData.wrestler2?.toLowerCase().replace(/\s+/g, '');
-      const wrestlerKey = wrestler.toLowerCase().replace(/\s+/g, '');
+      const wrestlerKey = wrestler.toLowerCase().trim();
       
-      if (wrestler1Name && wrestlerKey.includes(wrestler1Name.split(' ')[0])) {
+      // Get the first name of each wrestler for comparison (same logic as BettingButtons)
+      const wrestler1FirstName = matchData.wrestler1?.toLowerCase().split(' ')[0] || '';
+      const wrestler2FirstName = matchData.wrestler2?.toLowerCase().split(' ')[0] || '';
+      
+      console.log(`🔍 Comparing: "${wrestlerKey}" vs "${wrestler1FirstName}" and "${wrestler2FirstName}"`);
+      console.log(`🔍 Pools: wrestler1=${pools.wrestler1}, wrestler2=${pools.wrestler2}`);
+      
+      // Match wrestler key to the correct pool using exact first name match
+      if (wrestlerKey === wrestler1FirstName) {
         wrestlerWC = pools.wrestler1;
-      } else if (wrestler2Name && wrestlerKey.includes(wrestler2Name.split(' ')[0])) {
+        console.log(`✅ Matched to wrestler1 (${matchData.wrestler1}): ${wrestlerWC} WC`);
+      } else if (wrestlerKey === wrestler2FirstName) {
         wrestlerWC = pools.wrestler2;
+        console.log(`✅ Matched to wrestler2 (${matchData.wrestler2}): ${wrestlerWC} WC`);
       } else {
-        // Fallback mapping
-        if (matchId === 'taylor-yazdani') {
-          wrestlerWC = wrestler.toLowerCase() === 'taylor' ? pools.wrestler1 : pools.wrestler2;
-        } else if (matchId === 'dake-punia') {
-          wrestlerWC = wrestler.toLowerCase() === 'dake' ? pools.wrestler1 : pools.wrestler2;
-        } else if (matchId === 'steveson-petriashvili') {
-          wrestlerWC = wrestler.toLowerCase() === 'steveson' ? pools.wrestler1 : pools.wrestler2;
+        // Fallback: if wrestler key doesn't match, use a more reliable method
+        console.log(`⚠️ No direct match found, using position-based fallback`);
+        
+        // Use the wrestler key to determine position in the match
+        // This ensures consistent mapping between calls
+        const wrestlerKeys = [wrestler1FirstName, wrestler2FirstName];
+        const wrestlerIndex = wrestlerKeys.indexOf(wrestlerKey);
+        
+        if (wrestlerIndex === 0) {
+          wrestlerWC = pools.wrestler1;
+          console.log(`🔄 Position-based: wrestler1 = ${wrestlerWC} WC`);
+        } else if (wrestlerIndex === 1) {
+          wrestlerWC = pools.wrestler2;
+          console.log(`🔄 Position-based: wrestler2 = ${wrestlerWC} WC`);
+        } else {
+          // Last resort: use hash-based assignment to ensure different percentages
+          const hash = wrestlerKey.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+          const isFirst = hash % 2 === 0;
+          wrestlerWC = isFirst ? pools.wrestler1 : pools.wrestler2;
+          console.log(`🔄 Hash-based: ${isFirst ? 'wrestler1' : 'wrestler2'} = ${wrestlerWC} WC`);
         }
       }
       
       const percentage = Math.round((wrestlerWC / totalWC) * 100);
-      return percentage === 0 ? fallbackValue : percentage;
+      console.log(`📊 Final percentage for ${wrestler}: ${percentage}% (${wrestlerWC}/${totalWC})`);
+      
+      // Ensure we never return 0% unless it's truly 0 WC
+      if (wrestlerWC === 0) {
+        return 1;
+      }
+      
+      // Allow 50-50 percentages only when pools are truly equal (new matches)
+      // This prevents the issue where both wrestlers show the same percentage due to calculation errors
+      if (percentage === 50 && pools.wrestler1 !== pools.wrestler2) {
+        // If pools are different but percentage is 50, adjust slightly
+        return wrestlerWC === pools.wrestler1 ? 51 : 49;
+      }
+      
+      // If pools are truly equal (100-100), allow 50-50
+      if (pools.wrestler1 === pools.wrestler2 && percentage === 50) {
+        return 50; // This is a legitimate 50-50 for new matches
+      }
+      
+      return percentage;
     },
 
     getTotalWCInPool: (matchId) => {
@@ -227,14 +318,14 @@ const FrontPageOptimized = () => {
   const handleConfirmBet = (amount) => {
     const { matchId, wrestler, odds: betOdds } = bettingModal;
     
-    const success = deductBalance(amount, `Bet on ${wrestler}`);
-    
-    if (success) {
-      placeBetFromVote(matchId, wrestler, betOdds, amount);
-      alert(`✅ Bet Placed Successfully!\n\n${wrestler}: ${amount} WC at ${betOdds} odds\nPotential Payout: ${Math.floor(amount * parseFloat(betOdds))} WC\nRemaining Balance: ${getFormattedBalance()}`);
-    } else {
-      alert('❌ Failed to place bet. Please try again.');
+    if (balance < amount) {
+      alert(`❌ Insufficient Balance!\n\nYour balance: ${getFormattedBalance()}\nBet amount: ${amount} WC`);
+      return;
     }
+
+    subtractFromBalance(amount);
+    placeBetFromVote(matchId, wrestler, amount, betOdds);
+    alert(`✅ Bet Placed Successfully!\n\n${wrestler}: ${amount} WC at ${betOdds} odds\nPotential Payout: ${Math.floor(amount * parseFloat(betOdds))} WC\nRemaining Balance: ${getFormattedBalance()}`);
   };
 
   // Modal handlers
@@ -280,7 +371,7 @@ const FrontPageOptimized = () => {
   }
 
   return (
-    <div className="font-inter overflow-x-hidden text-white mobile-optimized high-dpi-text">
+    <div className="font-inter overflow-x-hidden text-white mobile-optimized high-dpi-text no-glow">
       <SharedHeader 
         onTogglePurchaseModal={() => setShowPurchaseModal(!showPurchaseModal)}
         showPurchaseModal={showPurchaseModal}

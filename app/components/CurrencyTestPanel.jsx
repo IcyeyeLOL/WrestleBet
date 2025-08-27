@@ -74,11 +74,11 @@ const CurrencyTestPanel = () => {
       <div>
         <h4 className="text-white font-semibold mb-3">Recent Transactions</h4>
         <div className="bg-slate-700/30 rounded-lg p-4 max-h-48 overflow-y-auto border border-slate-600">
-          {transactions.length === 0 ? (
+          {(!transactions || transactions.length === 0) ? (
             <p className="text-gray-400 text-sm text-center py-4">No transactions yet</p>
           ) : (
             <div className="space-y-3">
-              {transactions.slice(-5).reverse().map((transaction, index) => (
+              {transactions.slice(-5).reverse().map((transaction) => (
                 <div key={transaction.id} className="flex items-center justify-between p-2 bg-slate-700/50 rounded border border-slate-600">
                   <div>
                     <span className="text-gray-300 text-sm">{transaction.description}</span>

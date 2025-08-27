@@ -24,11 +24,19 @@ const MatchCard = ({
   
   // Generate wrestler initials
   const getInitials = (name) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    if (!name || typeof name !== 'string') return '';
+    return name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(n => n[0])
+      .join('')
+      .toUpperCase();
   };
 
   // Get wrestler key for odds lookup
   const getWrestlerKey = (wrestler) => {
+    if (!wrestler || typeof wrestler !== 'string') return '';
     return wrestler.toLowerCase().replace(/\s+/g, '');
   };
 
@@ -75,26 +83,26 @@ const MatchCard = ({
         <div className="flex-1 mb-4 md:mb-0">
           {/* Match Header */}
           <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-base md:text-xl font-bold mb-4">
-            <div className="flex items-center justify-center md:justify-start gap-4 bg-slate-800/50 rounded-2xl p-4">
+            <div className="flex items-center justify-center md:justify-start gap-2 md:gap-4 bg-slate-800/50 rounded-2xl p-3 md:p-4">
               <div className="text-center">
-                <div className={`w-12 h-12 bg-gradient-to-br ${colors.wrestler1} rounded-xl flex items-center justify-center text-white font-black text-sm mb-2`}>
+                <div className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br ${colors.wrestler1} rounded-xl flex items-center justify-center text-white font-black text-xs md:text-sm mb-1 md:mb-2`}>
                   {getInitials(wrestler1)}
                 </div>
-                <span className="text-slate-300 text-sm md:text-base font-semibold">{wrestler1}</span>
+                <span className="text-slate-300 text-xs md:text-sm lg:text-base font-semibold break-words">{wrestler1 || 'Wrestler 1'}</span>
               </div>
               
               <div className="flex flex-col items-center">
-                <span className="text-yellow-400 text-xs font-bold px-3 py-1 bg-yellow-400/20 rounded-full mb-2">
+                <span className="text-yellow-400 text-xs font-bold px-2 md:px-3 py-1 bg-yellow-400/20 rounded-full mb-1 md:mb-2">
                   {weightClass} {event?.toUpperCase() || 'MATCH'}
                 </span>
                 <span className="text-slate-400 text-sm font-bold">VS</span>
               </div>
               
               <div className="text-center">
-                <div className={`w-12 h-12 bg-gradient-to-br ${colors.wrestler2} rounded-xl flex items-center justify-center text-white font-black text-sm mb-2`}>
+                <div className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br ${colors.wrestler2} rounded-xl flex items-center justify-center text-white font-black text-xs md:text-sm mb-1 md:mb-2`}>
                   {getInitials(wrestler2)}
                 </div>
-                <span className="text-slate-300 text-sm md:text-base font-semibold">{wrestler2}</span>
+                <span className="text-slate-300 text-xs md:text-sm lg:text-base font-semibold break-words">{wrestler2 || 'Wrestler 2'}</span>
               </div>
             </div>
           </div>

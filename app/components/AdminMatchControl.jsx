@@ -28,40 +28,82 @@ const AdminMatchControl = () => {
         : '/api/admin/matches';
       
       const response = await fetch(url);
-      const data = await response.json();
+      if (!response.ok) {
+        // Graceful fallback without throwing to avoid noisy console
+        // Prefer local demo storage if present
+        try {
+          const stored = localStorage.getItem('admin_demo_matches');
+          const localMatches = stored ? JSON.parse(stored) : [];
+          if (Array.isArray(localMatches) && localMatches.length > 0) {
+            setMatches(localMatches);
+            setLoading(false);
+            return;
+          }
+        } catch {}
+        setMatches([{ id: 'taylor-yazdani', wrestler1: 'David Taylor', wrestler2: 'Hassan Yazdani', event_name: 'World Wrestling Championship', weight_class: '86kg', match_date: '2025-08-15', status: 'upcoming', total_pool: 150, created_at: new Date().toISOString() }]);
+        setLoading(false);
+        return;
+      }
+      const data = await response.json().catch(() => ({ success: false, error: 'Invalid JSON' }));
+      
+      const mergeWithLocal = (apiMatches = []) => {
+        try {
+          const stored = localStorage.getItem('admin_demo_matches');
+          const localMatches = stored ? JSON.parse(stored) : [];
+          
+          // Create a map to ensure unique IDs and prioritize local matches over API matches
+          const byId = new Map();
+          
+          // First add API matches
+          (apiMatches || []).forEach(m => {
+            if (m && m.id) byId.set(m.id, m);
+          });
+          
+          // Then add/override with local matches (local takes precedence)
+          (localMatches || []).forEach(m => {
+            if (m && m.id) byId.set(m.id, m);
+          });
+          
+          let merged = Array.from(byId.values());
+          
+          // Additional deduplication by ID (safety net)
+          const uniqueById = new Map();
+          merged.forEach(match => {
+            if (match && match.id) {
+              uniqueById.set(match.id, match);
+            }
+          });
+          merged = Array.from(uniqueById.values());
+          
+          // Filter by status if needed
+          if (selectedStatus !== 'all') {
+            merged = merged.filter(m => (m.status || 'upcoming') === selectedStatus);
+          }
+          
+          // Debug logging
+          console.log('Merged matches:', merged.map(m => ({ id: m.id, wrestler1: m.wrestler1, wrestler2: m.wrestler2 })));
+          
+          return merged;
+        } catch (error) {
+          console.error('Error merging matches:', error);
+          return apiMatches || [];
+        }
+      };
       
       if (data.success) {
-        setMatches(data.matches || []);
+        setMatches(mergeWithLocal(data.matches));
       } else {
         console.error('API Error:', data.error);
-        // Fallback to sample data for demo
-        setMatches([
-          {
-            id: 'taylor-yazdani',
-            wrestler1: 'David Taylor',
-            wrestler2: 'Hassan Yazdani',
-            event_name: 'World Wrestling Championship',
-            weight_class: '86kg',
-            match_date: '2025-08-15',
-            status: 'upcoming',
-            total_pool: 150,
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 'dake-punia',
-            wrestler1: 'Kyle Dake',
-            wrestler2: 'Deepak Punia', 
-            event_name: 'Olympic Trials',
-            weight_class: '74kg',
-            match_date: '2025-08-20',
-            status: 'upcoming',
-            total_pool: 200,
-            created_at: new Date().toISOString()
+        try {
+          const stored = localStorage.getItem('admin_demo_matches');
+          const localMatches = stored ? JSON.parse(stored) : [];
+          if (Array.isArray(localMatches) && localMatches.length > 0) {
+            setMatches(mergeWithLocal(localMatches));
           }
-        ]);
+        } catch {}
       }
     } catch (error) {
-      console.error('Error loading matches:', error);
+      // Quiet fallback to demo data
       // Fallback to sample data for demo
       setMatches([
         {
@@ -81,6 +123,18 @@ const AdminMatchControl = () => {
     }
   };
 
+  useEffect(() => {
+    const onCreated = () => loadMatches();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('admin-match-created', onCreated);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('admin-match-created', onCreated);
+      }
+    };
+  }, [selectedStatus]);
+
   const handleCreateMatch = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -96,7 +150,42 @@ const AdminMatchControl = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
+      // Persist locally in demo mode or if backend refused
+      if (!data.success) {
+        console.warn('Creating match in demo mode (local only):', data.error);
+      }
+
+      // Build a canonical match object for local storage/front-end
+      const generateUniqueId = (wrestler1, wrestler2) => {
+        const baseId = `${wrestler1?.toLowerCase().replace(/\s+/g,'')}-${wrestler2?.toLowerCase().replace(/\s+/g,'')}`;
+        const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+        return `${baseId}-${timestamp}`;
+      };
+
+      const newMatch = {
+        id: generateUniqueId(formData.wrestler1, formData.wrestler2),
+        wrestler1: formData.wrestler1,
+        wrestler2: formData.wrestler2,
+        event_name: formData.eventName,
+        weight_class: formData.weightClass,
+        match_date: formData.matchDate || null,
+        status: 'upcoming',
+        total_bets: 0,
+        total_votes: 0,
+        created_at: new Date().toISOString()
+      };
+
+      // Save to localStorage list used by frontend demo mode
+      const current = localStorage.getItem('admin_demo_matches');
+      const list = current ? (()=>{ try { return JSON.parse(current) } catch { return [] } })() : [];
+      list.push(newMatch);
+      localStorage.setItem('admin_demo_matches', JSON.stringify(list));
+
+      // Notify frontend to refresh immediately
+      try {
+        window.dispatchEvent(new CustomEvent('admin-match-created'));
+      } catch {}
+
         await loadMatches(); // Reload matches
         setShowCreateForm(false);
         setFormData({ 
@@ -107,10 +196,7 @@ const AdminMatchControl = () => {
           matchDate: '',
           matchTime: '' 
         });
-        alert('✅ Match created successfully!');
-      } else {
-        alert(`❌ Error: ${data.error}`);
-      }
+      alert('✅ Match created! It will appear on the front page shortly.');
     } catch (error) {
       console.error('Failed to create match:', error);
       alert('❌ Failed to create match. Check console for details.');
@@ -138,6 +224,23 @@ const AdminMatchControl = () => {
       const data = await response.json();
       if (data.success) {
         await loadMatches(); // Reload matches
+        // Mark as completed in local demo storage and notify UI
+        try {
+          const stored = localStorage.getItem('admin_demo_matches');
+          if (stored) {
+            const arr = JSON.parse(stored);
+            const idx = arr.findIndex(m => m.id === matchId);
+            if (idx !== -1) {
+              arr[idx].status = 'completed';
+              arr[idx].winner = winner;
+              localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+            }
+          }
+        } catch {}
+
+        try {
+          window.dispatchEvent(new CustomEvent('admin-declare-winner', { detail: { matchId, winner } }));
+        } catch {}
         
         const payoutSummary = data.payoutSummary || {};
         const message = `🎉 Winner declared successfully!\n\n💰 Payout Summary:\n` +
@@ -160,18 +263,68 @@ const AdminMatchControl = () => {
     if (!window.confirm('🗑️ Delete this match?\n\n⚠️ This will remove the match and all associated bets. This action cannot be undone!')) return;
 
     try {
-      const response = await fetch('/api/admin/matches', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, adminKey: 'wrestlebet-admin-2025' })
+      // Check if this is a demo match (created locally)
+      const stored = localStorage.getItem('admin_demo_matches');
+      const isDemoMatch = stored ? JSON.parse(stored).some(m => m.id === matchId) : false;
+      
+      if (isDemoMatch) {
+        // Handle demo match deletion locally
+        const arr = JSON.parse(stored).filter(m => m.id !== matchId);
+        localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+        
+        // Notify front page to remove card immediately
+        try {
+          window.dispatchEvent(new CustomEvent('admin-match-deleted', { detail: { matchId } }));
+        } catch {}
+        
+        await loadMatches();
+        alert('✅ Match deleted successfully!');
+        return;
+      }
+
+      // Try API deletion for real matches
+      const params = new URLSearchParams({ id: String(matchId), adminUserId: 'admin-user-id' });
+      const response = await fetch(`/api/admin/matches?${params.toString()}`, {
+        method: 'DELETE'
       });
 
       const data = await response.json();
       if (data.success) {
+        // Remove from local demo storage as well (in case it was there)
+        try {
+          const stored = localStorage.getItem('admin_demo_matches');
+          if (stored) {
+            const arr = JSON.parse(stored).filter(m => m.id !== matchId);
+            localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+          }
+        } catch {}
+
+        // Notify front page to remove card immediately
+        try {
+          window.dispatchEvent(new CustomEvent('admin-match-deleted', { detail: { matchId } }));
+        } catch {}
+
         await loadMatches();
         alert('✅ Match deleted successfully!');
       } else {
-        alert(`❌ Error: ${data.error}`);
+        // If API fails, try local deletion as fallback
+        console.warn('API deletion failed, trying local deletion:', data.error);
+        try {
+          const stored = localStorage.getItem('admin_demo_matches');
+          if (stored) {
+            const arr = JSON.parse(stored).filter(m => m.id !== matchId);
+            localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+          }
+          
+          try {
+            window.dispatchEvent(new CustomEvent('admin-match-deleted', { detail: { matchId } }));
+          } catch {}
+          
+          await loadMatches();
+          alert('✅ Match deleted locally (API unavailable)!');
+        } catch (localError) {
+          alert(`❌ Error: ${data.error}`);
+        }
       }
     } catch (error) {
       console.error('Error deleting match:', error);
@@ -246,7 +399,7 @@ const AdminMatchControl = () => {
                   placeholder="e.g., David Taylor"
                   value={formData.wrestler1}
                   onChange={(e) => setFormData({...formData, wrestler1: e.target.value})}
-                  className="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500"
+                  className="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 text-base"
                   required
                 />
               </div>
@@ -257,7 +410,7 @@ const AdminMatchControl = () => {
                   placeholder="e.g., Hassan Yazdani"
                   value={formData.wrestler2}
                   onChange={(e) => setFormData({...formData, wrestler2: e.target.value})}
-                  className="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500"
+                  className="w-full p-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 text-base"
                   required
                 />
               </div>
@@ -353,8 +506,13 @@ const AdminMatchControl = () => {
             <p className="text-gray-500 mt-2">Create your first match to get started!</p>
           </div>
         ) : (
-          matches.map((match) => (
-            <div key={match.id} className="bg-gray-800 p-6 rounded-lg border border-gray-700 hover:border-blue-500 transition-colors">
+          matches
+            .filter((match, index, self) => 
+              // Remove duplicates by ID as final safety check
+              index === self.findIndex(m => m.id === match.id)
+            )
+            .map((match, index) => (
+            <div key={`${match.id}-${index}`} className="bg-gray-800 p-6 rounded-lg border border-gray-700 hover:border-blue-500 transition-colors">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
@@ -371,18 +529,18 @@ const AdminMatchControl = () => {
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-300">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 text-gray-300">
                     <div>
-                      <span className="text-gray-400">🏆 Event:</span><br/>
-                      <span className="font-medium">{match.event_name || match.eventName || 'No event specified'}</span>
+                      <span className="text-gray-400 text-sm">🏆 Event:</span><br/>
+                      <span className="font-medium text-sm md:text-base">{match.event_name || match.eventName || 'No event specified'}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">⚖️ Weight:</span><br/>
-                      <span className="font-medium">{match.weight_class || match.weightClass || 'Not specified'}</span>
+                      <span className="text-gray-400 text-sm">⚖️ Weight:</span><br/>
+                      <span className="font-medium text-sm md:text-base">{match.weight_class || match.weightClass || 'Not specified'}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">📅 Date:</span><br/>
-                      <span className="font-medium">{match.match_date || match.matchDate ? new Date(match.match_date || match.matchDate).toLocaleDateString() : 'TBD'}</span>
+                      <span className="text-gray-400 text-sm">📅 Date:</span><br/>
+                      <span className="font-medium text-sm md:text-base">{match.match_date || match.matchDate ? new Date(match.match_date || match.matchDate).toLocaleDateString() : 'TBD'}</span>
                     </div>
                   </div>
                   
