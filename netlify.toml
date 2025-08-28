@@ -7,6 +7,18 @@
   NODE_ENV = "production"
   NPM_FLAGS = "--legacy-peer-deps"
 
+# Fix Clerk authentication routing
+[[redirects]]
+  from = "/sign-in/*"
+  to = "/sign-in"
+  status = 200
+
+[[redirects]]
+  from = "/sign-up/*"
+  to = "/sign-up"
+  status = 200
+
+# Handle all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -11,12 +11,8 @@ export default function SignUpPage() {
           afterSignInUrl="/"
           afterSignUpUrl="/"
           signInUrl="/sign-in"
-          appearance={{
-            elements: {
-              rootBox: "mx-auto",
-              card: "bg-white/90 shadow-xl border-0",
-            }
-          }}
+          routing="path"
+          path="/sign-up"
         />
       </div>
     </div>

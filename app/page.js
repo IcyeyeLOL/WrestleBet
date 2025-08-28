@@ -1,7 +1,9 @@
+import ClerkTestComponent from './components/ClerkTestComponent';
+
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-      <div className="text-center">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-8">
+      <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-4">WrestleBet</h1>
         <p className="text-xl text-gray-300 mb-8">Welcome to the wrestling betting platform</p>
         <div className="space-y-4">
@@ -18,6 +20,11 @@ export default function Home() {
             View Bets
           </a>
         </div>
+      </div>
+      
+      {/* Authentication Test Component */}
+      <div className="w-full max-w-md">
+        <ClerkTestComponent />
       </div>
     </div>
   );
