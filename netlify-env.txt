@@ -1,8 +1,8 @@
 # Netlify Environment Variables
 # Add these in your Netlify dashboard under Site settings > Environment variables
 
-# Node.js Version (CRITICAL - Fixes the build error)
-NODE_VERSION=18
+# Node.js Version (CRITICAL - Latest LTS version)
+NODE_VERSION=20
 
 # Build Environment
 NODE_ENV=production
@@ -22,5 +22,5 @@ STRIPE_WEBHOOK_SECRET=whsec_your_stripe_webhook_secret_here
 # 2. Click on "Site settings" tab
 # 3. Click on "Environment variables" in the left sidebar
 # 4. Add each variable above with its corresponding value
-# 5. Make sure NODE_VERSION=18 is set FIRST
+# 5. Make sure NODE_VERSION=20 is set FIRST
 # 6. Redeploy your site after adding environment variables
