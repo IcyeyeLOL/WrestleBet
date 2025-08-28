@@ -53,24 +53,22 @@ const AccountPage = () => {
   let getBalanceStatus = () => 'normal';
   let currencyLoading = false;
   
-  try {
-    const bettingContext = useBetting();
-    if (bettingContext) {
-      bets = bettingContext.bets || [];
-      bettingStats = bettingContext.bettingStats || {};
-      bettingLoading = bettingContext.loading || false;
-    }
-    
-    const currencyContext = useCurrency();
-    if (currencyContext) {
-      balance = currencyContext.balance || 0;
-      transactions = currencyContext.transactions || [];
-      getFormattedBalance = currencyContext.getFormattedBalance || (() => '0 WC');
-      getBalanceStatus = currencyContext.getBalanceStatus || (() => 'normal');
-      currencyLoading = currencyContext.loading || false;
-    }
-  } catch (error) {
-    console.error('Error accessing contexts in AccountPage:', error);
+  // Move hooks to top level
+  const bettingContext = useBetting();
+  const currencyContext = useCurrency();
+  
+  if (bettingContext) {
+    bets = bettingContext.bets || [];
+    bettingStats = bettingContext.bettingStats || {};
+    bettingLoading = bettingContext.loading || false;
+  }
+  
+  if (currencyContext) {
+    balance = currencyContext.balance || 0;
+    transactions = currencyContext.transactions || [];
+    getFormattedBalance = currencyContext.getFormattedBalance || (() => '0 WC');
+    getBalanceStatus = currencyContext.getBalanceStatus || (() => 'normal');
+    currencyLoading = currencyContext.loading || false;
   }
 
   const handleInputChange = (e) => {
