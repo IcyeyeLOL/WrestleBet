@@ -10,7 +10,28 @@ const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.e
 // Merge admin-demo matches from localStorage via cookie-less approach is not possible on server.
 // To allow quick demo sync, also read from an in-memory env var string if provided.
 // Developers can set NEXT_PUBLIC_ADMIN_DEMO_MATCHES with JSON array.
-const demoMatchesBase = [];
+const demoMatchesBase = [
+  {
+    id: 'demo-1',
+    wrestler1: 'David Taylor',
+    wrestler2: 'Hassan Yazdani',
+    voteCounts: { 'David Taylor': 45, 'Hassan Yazdani': 55 },
+    totalVotes: 100,
+    event_name: 'World Wrestling Championship',
+    weight_class: '86kg',
+    status: 'upcoming'
+  },
+  {
+    id: 'demo-2',
+    wrestler1: 'Kyle Dake',
+    wrestler2: 'Frank Chamizo',
+    voteCounts: { 'Kyle Dake': 60, 'Frank Chamizo': 40 },
+    totalVotes: 100,
+    event_name: 'Olympic Trials',
+    weight_class: '74kg',
+    status: 'upcoming'
+  }
+];
 
 const getDemoMatches = () => {
   try {

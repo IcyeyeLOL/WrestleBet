@@ -154,6 +154,17 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
                   <span className="font-medium">{item.label}</span>
                 </Link>
               ))}
+              
+              {/* Home Navigation Button */}
+              <div className="pt-4 border-t border-white/10">
+                <Link
+                  href="/"
+                  className="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-green-400 hover:bg-green-500/20 hover:text-green-300"
+                >
+                  <span className="text-xl">🏠</span>
+                  <span className="font-medium">Go Home</span>
+                </Link>
+              </div>
             </nav>
           </div>
           

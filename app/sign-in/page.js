@@ -10,15 +10,14 @@ export default function SignInPage() {
         <SignIn 
           afterSignInUrl="/"
           afterSignUpUrl="/"
-          signUpUrl="/signup"
-          appearance={{
-            elements: {
-                rootBox: "mx-auto",
-                card: "bg-white/90 shadow-xl border-0",
-              }
-            }}
-          />
-        </div>
+          signUpUrl="/sign-up"
+          routing="path"
+          path="/sign-in"
+          redirectUrl="/sign-in"
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+        />
       </div>
-    );
+    </div>
+  );
 }

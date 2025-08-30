@@ -128,7 +128,7 @@ const SentimentAnalysis = ({
           className="h-full transition-all duration-500 ease-out flex items-center justify-center"
           style={{ 
             width: `${Math.max(wrestler1Percentage, 2)}%`,
-            background: `linear-gradient(90deg, ${wrestler1Colors.from}, ${wrestler1Colors.to})`,
+            background: `${wrestler1Colors.from}`,
             boxShadow: `0 0 8px ${wrestler1Colors.from}40`,
             minWidth: wrestler1Percentage > 0 ? '8px' : '0px'
           }}
@@ -144,7 +144,7 @@ const SentimentAnalysis = ({
           className="absolute top-0 h-full transition-all duration-500 ease-out flex items-center justify-center"
           style={{ 
             width: `${Math.max(wrestler2Percentage, 2)}%`,
-            background: `linear-gradient(90deg, ${wrestler2Colors.from}, ${wrestler2Colors.to})`,
+            background: `${wrestler2Colors.from}`,
             boxShadow: `0 0 8px ${wrestler2Colors.from}40`,
             right: 0,
             minWidth: wrestler2Percentage > 0 ? '8px' : '0px'
@@ -183,7 +183,7 @@ const SentimentAnalysis = ({
           <span 
             className="w-3 h-3 rounded-full shadow-lg"
             style={{
-              background: `linear-gradient(135deg, ${wrestler1Colors.from}, ${wrestler1Colors.to})`
+              background: `${wrestler1Colors.from}`
             }}
           ></span>
           <span className="text-slate-300 font-medium">{typeof wrestler1 === 'string' && wrestler1 ? wrestler1.split(' ')[0] : 'Wrestler 1'}</span>
@@ -201,7 +201,7 @@ const SentimentAnalysis = ({
           <span 
             className="w-3 h-3 rounded-full shadow-lg"
             style={{
-              background: `linear-gradient(135deg, ${wrestler2Colors.from}, ${wrestler2Colors.to})`
+              background: `${wrestler2Colors.from}`
             }}
           ></span>
           <span className="text-slate-300 font-medium">{typeof wrestler2 === 'string' && wrestler2 ? wrestler2.split(' ')[0] : 'Wrestler 2'}</span>

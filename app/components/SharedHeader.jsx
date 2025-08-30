@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 // Temporarily using text icons instead of lucide-react
 // import { Menu, X } from 'lucide-react';
 import { useUser, UserButton } from '@clerk/nextjs';
@@ -13,10 +13,41 @@ import AuthModal from './AuthModal';
 
 const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('signin');
+  const [secretKeySequence, setSecretKeySequence] = useState([]);
   const { isSignedIn, user, isLoaded } = useUser();
+
+  // Secret admin access - press 'A' + 'D' + 'M' + 'I' + 'N' in sequence
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      const key = event.key.toLowerCase();
+      const adminSequence = ['a', 'd', 'm', 'i', 'n'];
+      
+      setSecretKeySequence(prev => {
+        const newSequence = [...prev, key];
+        
+        // Keep only last 5 keys
+        if (newSequence.length > 5) {
+          newSequence.shift();
+        }
+        
+        // Check if sequence matches admin
+        if (newSequence.length === 5 && newSequence.join('') === 'admin') {
+          console.log('🔐 Secret admin access activated!');
+          router.push('/admin');
+          return [];
+        }
+        
+        return newSequence;
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [router]);
 
   const isActive = (path) => {
     return pathname === path;
@@ -50,16 +81,45 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
         <div className="max-w-7xl mx-auto px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <Link 
-              href="/" 
-              className="flex items-center gap-2 text-yellow-400 text-xl md:text-2xl font-black hover:text-yellow-300 transition-colors"
-              onClick={closeMobileMenu}
-            >
-              <span className="text-2xl">🤼</span>
-              <span className="bg-gradient-to-r from-yellow-400 to-yellow-500 bg-clip-text text-transparent">
-                WrestleBet
-              </span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link 
+                href="/" 
+                className="flex items-center gap-2 text-yellow-400 text-xl md:text-2xl font-black hover:text-yellow-300 transition-colors"
+                onClick={closeMobileMenu}
+              >
+                <span className="text-2xl">🤼</span>
+                <span className="text-yellow-400">
+                  WrestleBet
+                </span>
+              </Link>
+              
+              {/* Hidden admin access - triple click on the emoji */}
+              <div 
+                className="cursor-pointer select-none"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Count clicks and redirect to admin after 3 clicks
+                  const clickCount = parseInt(localStorage.getItem('adminClickCount') || '0') + 1;
+                  localStorage.setItem('adminClickCount', clickCount.toString());
+                  
+                  if (clickCount >= 3) {
+                    localStorage.removeItem('adminClickCount');
+                    console.log('🔐 Triple-click admin access activated!');
+                    router.push('/admin');
+                  }
+                  
+                  // Reset count after 3 seconds
+                  setTimeout(() => {
+                    localStorage.removeItem('adminClickCount');
+                  }, 3000);
+                }}
+                title=""
+              >
+                <span className="text-2xl opacity-0 hover:opacity-100 transition-opacity duration-300 md:block hidden">⚙️</span>
+                <span className="text-xl opacity-20 md:hidden">⚙️</span>
+              </div>
+            </div>
             
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
@@ -74,7 +134,7 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                 >
                   Home
                   {isActive('/') && (
-                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full"></div>
+                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-yellow-400 rounded-full"></div>
                   )}
                 </Link>
                 <Link 
@@ -87,7 +147,7 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                 >
                   Betting
                   {isActive('/bets') && (
-                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full"></div>
+                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-yellow-400 rounded-full"></div>
                   )}
                 </Link>
                 <Link 
@@ -100,7 +160,7 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                 >
                   Account
                   {isActive('/account') && (
-                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full"></div>
+                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-yellow-400 rounded-full"></div>
                   )}
                 </Link>
                 <Link 
@@ -113,9 +173,10 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                 >
                   Donation
                   {isActive('/donation') && (
-                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full"></div>
+                    <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-yellow-400 rounded-full"></div>
                   )}
                 </Link>
+                {/* Admin link removed for stealth access */}
               </nav>
               
               <div className="flex items-center gap-3 pl-4 border-l border-slate-600">
@@ -125,6 +186,17 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                   onTogglePurchaseModal={onTogglePurchaseModal}
                   showPurchaseModal={showPurchaseModal}
                 />
+                
+                {/* Quick Admin Access */}
+                <Link 
+                  href="/admin/access"
+                  className="p-2 text-slate-400 hover:text-yellow-400 transition-colors"
+                  title="Admin Access Guide"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 8A6 6 0 006 8c0 7-3 9-3 9s3 2 3 9a6 6 0 0012 0c0-7 3-9 3-9s-3-2-3-9zM8 8a2 2 0 114 0 2 2 0 01-4 0z" clipRule="evenodd" />
+                  </svg>
+                </Link>
                 
                 {/* Authentication */}
                 {isLoaded && (
@@ -147,7 +219,7 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={openSignIn}
-                          className="group relative bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black px-6 py-3 rounded-xl font-bold transition-all duration-300 shadow-lg hover:shadow-yellow-400/30 hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
+                          className="group relative bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold transition-all duration-300 shadow-lg hover:shadow-yellow-400/30 hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
                         >
                           <span className="relative z-10 flex items-center gap-2">
                             <svg className="w-4 h-4 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 20 20">
@@ -155,7 +227,7 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                             </svg>
                             Sign In
                           </span>
-                          <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
                         </button>
                         <button 
                           onClick={openSignUp}
@@ -167,7 +239,7 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                             </svg>
                             Join Now
                           </span>
-                          <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 to-yellow-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
                         </button>
                       </div>
                     )}
@@ -298,6 +370,35 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
                 <span className="text-xl">❤️</span>
                 <span>Donation</span>
               </Link>
+              
+              {/* Hidden mobile admin access - long press */}
+              <div 
+                className="flex items-center gap-3 py-4 px-4 rounded-xl transition-all duration-300 font-medium text-slate-300 hover:text-yellow-400 hover:bg-slate-800/70 border border-transparent cursor-pointer"
+                onTouchStart={(e) => {
+                  const timer = setTimeout(() => {
+                    console.log('🔐 Mobile long-press admin access activated!');
+                    router.push('/admin');
+                    closeMobileMenu();
+                  }, 2000); // 2 second long press
+                  
+                  e.currentTarget._timer = timer;
+                }}
+                onTouchEnd={(e) => {
+                  if (e.currentTarget._timer) {
+                    clearTimeout(e.currentTarget._timer);
+                    delete e.currentTarget._timer;
+                  }
+                }}
+                onTouchCancel={(e) => {
+                  if (e.currentTarget._timer) {
+                    clearTimeout(e.currentTarget._timer);
+                    delete e.currentTarget._timer;
+                  }
+                }}
+              >
+                <span className="text-xl">📊</span>
+                <span>Statistics</span>
+              </div>
               
               {/* Mobile Menu Auth */}
               {isLoaded && !isSignedIn && (

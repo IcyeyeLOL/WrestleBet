@@ -74,7 +74,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     if (!supabaseConfigured) {
-      return NextResponse.json({ success: false, error: 'Backend not configured (Supabase). Configure env to create matches.' }, { status: 503 });
+      return NextResponse.json({ success: false, error: 'Demo mode: Backend not configured. Creating match locally.' }, { status: 503 });
     }
     const body = await request.json();
     const { 

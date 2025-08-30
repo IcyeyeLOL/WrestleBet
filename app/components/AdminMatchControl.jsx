@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { safeFetch } from '../lib/safeFetch';
+import globalStorage from '../lib/globalStorage';
 
 const AdminMatchControl = () => {
   const [matches, setMatches] = useState([]);
@@ -31,10 +32,10 @@ const AdminMatchControl = () => {
       const result = await safeFetch(url);
       if (!result.success) {
         // Graceful fallback without throwing to avoid noisy console
-        // Prefer local demo storage if present
+        // Prefer global storage if present
         try {
-          const stored = localStorage.getItem('admin_demo_matches');
-          const localMatches = stored ? JSON.parse(stored) : [];
+          const stored = globalStorage.get('admin_demo_matches');
+          const localMatches = stored || [];
           if (Array.isArray(localMatches) && localMatches.length > 0) {
             setMatches(localMatches);
             setLoading(false);
@@ -49,8 +50,8 @@ const AdminMatchControl = () => {
       
       const mergeWithLocal = (apiMatches = []) => {
         try {
-          const stored = localStorage.getItem('admin_demo_matches');
-          const localMatches = stored ? JSON.parse(stored) : [];
+          const stored = globalStorage.get('admin_demo_matches');
+          const localMatches = stored || [];
           
           // Create a map to ensure unique IDs and prioritize local matches over API matches
           const byId = new Map();
@@ -96,8 +97,8 @@ const AdminMatchControl = () => {
       } else {
         console.error('API Error:', data.error);
         try {
-          const stored = localStorage.getItem('admin_demo_matches');
-          const localMatches = stored ? JSON.parse(stored) : [];
+          const stored = globalStorage.get('admin_demo_matches');
+          const localMatches = stored || [];
           if (Array.isArray(localMatches) && localMatches.length > 0) {
             setMatches(mergeWithLocal(localMatches));
           }
@@ -141,6 +142,7 @@ const AdminMatchControl = () => {
     setLoading(true);
 
     try {
+      // Try to create match via API first
       const result = await safeFetch('/api/admin/matches', {
         method: 'POST',
         body: JSON.stringify({
@@ -150,9 +152,9 @@ const AdminMatchControl = () => {
       });
 
       const data = result.data;
-      // Persist locally in demo mode or if backend refused
+      // If API fails (e.g., Supabase not configured), create locally
       if (!result.success || !data.success) {
-        console.warn('Creating match in demo mode (local only):', data.error);
+        console.log('Creating match in demo mode (local only):', data?.error || 'API not available');
       }
 
       // Build a canonical match object for local storage/front-end
@@ -175,18 +177,64 @@ const AdminMatchControl = () => {
         created_at: new Date().toISOString()
       };
 
-      // Save to localStorage list used by frontend demo mode
-      const current = localStorage.getItem('admin_demo_matches');
-      const list = current ? (()=>{ try { return JSON.parse(current) } catch { return [] } })() : [];
+      // Save to global storage list used by frontend demo mode
+      const current = globalStorage.get('admin_demo_matches') || [];
+      const list = Array.isArray(current) ? current : [];
       list.push(newMatch);
-      localStorage.setItem('admin_demo_matches', JSON.stringify(list));
+      globalStorage.set('admin_demo_matches', list);
 
       // Notify frontend to refresh immediately
       try {
         window.dispatchEvent(new CustomEvent('admin-match-created'));
       } catch {}
 
-        await loadMatches(); // Reload matches
+      await loadMatches(); // Reload matches
+      setShowCreateForm(false);
+      setFormData({ 
+        wrestler1: '', 
+        wrestler2: '', 
+        eventName: '', 
+        weightClass: '', 
+        matchDate: '',
+        matchTime: '' 
+      });
+      alert('✅ Match created! It will appear on the front page shortly.');
+    } catch (error) {
+      console.error('Failed to create match:', error);
+      
+      // If API failed, try to create locally as fallback
+      try {
+        const generateUniqueId = (wrestler1, wrestler2) => {
+          const baseId = `${wrestler1?.toLowerCase().replace(/\s+/g,'')}-${wrestler2?.toLowerCase().replace(/\s+/g,'')}`;
+          const timestamp = Date.now().toString().slice(-6);
+          return `${baseId}-${timestamp}`;
+        };
+
+        const newMatch = {
+          id: generateUniqueId(formData.wrestler1, formData.wrestler2),
+          wrestler1: formData.wrestler1,
+          wrestler2: formData.wrestler2,
+          event_name: formData.eventName,
+          weight_class: formData.weightClass,
+          match_date: formData.matchDate || null,
+          status: 'upcoming',
+          total_bets: 0,
+          total_votes: 0,
+          created_at: new Date().toISOString()
+        };
+
+        // Save to global storage
+        const current = globalStorage.get('admin_demo_matches') || [];
+        const list = Array.isArray(current) ? current : [];
+        list.push(newMatch);
+        globalStorage.set('admin_demo_matches', list);
+
+        // Notify frontend
+        try {
+          window.dispatchEvent(new CustomEvent('admin-match-created'));
+        } catch {}
+
+        await loadMatches();
         setShowCreateForm(false);
         setFormData({ 
           wrestler1: '', 
@@ -196,10 +244,11 @@ const AdminMatchControl = () => {
           matchDate: '',
           matchTime: '' 
         });
-      alert('✅ Match created! It will appear on the front page shortly.');
-    } catch (error) {
-      console.error('Failed to create match:', error);
-      alert('❌ Failed to create match. Check console for details.');
+        alert('✅ Match created locally! It will appear on the front page shortly.');
+      } catch (localError) {
+        console.error('Failed to create match locally:', localError);
+        alert('❌ Failed to create match. Check console for details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -223,16 +272,16 @@ const AdminMatchControl = () => {
       const data = result.data;
       if (result.success && data.success) {
         await loadMatches(); // Reload matches
-        // Mark as completed in local demo storage and notify UI
+        // Mark as completed in global storage and notify UI
         try {
-          const stored = localStorage.getItem('admin_demo_matches');
-          if (stored) {
-            const arr = JSON.parse(stored);
+          const stored = globalStorage.get('admin_demo_matches') || [];
+          if (Array.isArray(stored)) {
+            const arr = [...stored];
             const idx = arr.findIndex(m => m.id === matchId);
             if (idx !== -1) {
               arr[idx].status = 'completed';
               arr[idx].winner = winner;
-              localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+              globalStorage.set('admin_demo_matches', arr);
             }
           }
         } catch {}
@@ -263,13 +312,13 @@ const AdminMatchControl = () => {
 
     try {
       // Check if this is a demo match (created locally)
-      const stored = localStorage.getItem('admin_demo_matches');
-      const isDemoMatch = stored ? JSON.parse(stored).some(m => m.id === matchId) : false;
+      const stored = globalStorage.get('admin_demo_matches') || [];
+      const isDemoMatch = Array.isArray(stored) && stored.some(m => m.id === matchId);
       
       if (isDemoMatch) {
         // Handle demo match deletion locally
-        const arr = JSON.parse(stored).filter(m => m.id !== matchId);
-        localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+        const arr = stored.filter(m => m.id !== matchId);
+        globalStorage.set('admin_demo_matches', arr);
         
         // Notify front page to remove card immediately
         try {
@@ -289,12 +338,12 @@ const AdminMatchControl = () => {
 
       const data = result.data;
       if (result.success && data.success) {
-        // Remove from local demo storage as well (in case it was there)
+        // Remove from global storage as well (in case it was there)
         try {
-          const stored = localStorage.getItem('admin_demo_matches');
-          if (stored) {
-            const arr = JSON.parse(stored).filter(m => m.id !== matchId);
-            localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+          const stored = globalStorage.get('admin_demo_matches') || [];
+          if (Array.isArray(stored)) {
+            const arr = stored.filter(m => m.id !== matchId);
+            globalStorage.set('admin_demo_matches', arr);
           }
         } catch {}
 
@@ -309,10 +358,10 @@ const AdminMatchControl = () => {
         // If API fails, try local deletion as fallback
         console.warn('API deletion failed, trying local deletion:', data.error);
         try {
-          const stored = localStorage.getItem('admin_demo_matches');
-          if (stored) {
-            const arr = JSON.parse(stored).filter(m => m.id !== matchId);
-            localStorage.setItem('admin_demo_matches', JSON.stringify(arr));
+          const stored = globalStorage.get('admin_demo_matches') || [];
+          if (Array.isArray(stored)) {
+            const arr = stored.filter(m => m.id !== matchId);
+            globalStorage.set('admin_demo_matches', arr);
           }
           
           try {
