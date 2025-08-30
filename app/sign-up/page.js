@@ -15,6 +15,12 @@ export default function SignUpPage() {
           redirectUrl="/sign-up"
           signInUrl="/sign-in"
           signUpUrl="/sign-up"
+          appearance={{
+            elements: {
+              rootBox: "mx-auto",
+              card: "bg-white/90 shadow-xl border-0",
+            }
+          }}
         />
       </div>
     </div>

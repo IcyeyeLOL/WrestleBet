@@ -3,6 +3,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import "./globals.css";
 import { BettingProvider } from './contexts/SimpleBettingContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import ClerkDebugger from './components/ClerkDebugger';
 
 const inter = Inter({
   variable: "--font-inter",
@@ -41,6 +42,7 @@ export default function RootLayout({ children }) {
         >
           <BettingProvider>
             <CurrencyProvider>
+              <ClerkDebugger />
               {children}
             </CurrencyProvider>
           </BettingProvider>
