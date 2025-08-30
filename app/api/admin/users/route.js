@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabase';
-// Static export configuration for Next.js
-export const dynamic = 'force-static';
-export const revalidate = false;
+// Dynamic export configuration for Next.js
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 
 

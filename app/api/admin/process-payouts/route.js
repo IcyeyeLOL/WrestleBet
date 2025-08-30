@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-// Static export configuration for Next.js
-export const dynamic = 'force-static';
-export const revalidate = false;
+// Dynamic export configuration for Next.js
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 
 
