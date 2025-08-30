@@ -15,7 +15,6 @@ export default function SignInPage() {
           path="/sign-in"
           redirectUrl="/sign-in"
           signInUrl="/sign-in"
-          signUpUrl="/sign-up"
         />
       </div>
     </div>
