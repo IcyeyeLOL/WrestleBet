@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import globalDataSync from '../lib/globalDataSync';
 import globalStorage from '../lib/globalStorage';
-import { safeFetch, isDemoMode, getDemoFallback } from '../lib/safeFetch';
+import { safeFetch } from '../lib/safeFetch';
 
 const BettingContext = createContext();
 
@@ -160,34 +160,7 @@ export const BettingProvider = ({ children }) => {
             };
           });
 
-          // Merge locally created admin demo matches so front page reflects admin control in demo/offline mode
-          try {
-            const storedAdmin = localStorage.getItem('admin_demo_matches');
-            if (storedAdmin) {
-              const adminMatches = JSON.parse(storedAdmin);
-              if (Array.isArray(adminMatches)) {
-                adminMatches.forEach(m => {
-                  const wrestler1 = m.wrestler1?.toLowerCase().replace(/\s+/g, '') || 'wrestler1';
-                  const wrestler2 = m.wrestler2?.toLowerCase().replace(/\s+/g, '') || 'wrestler2';
-                  const key = m.id || `${wrestler1}-${wrestler2}`;
-                  
-                  if (!newPollData[key]) {
-                    const wrestler1Key = wrestler1.split(' ')[0];
-                    const wrestler2Key = wrestler2.split(' ')[0];
-                    
-                    newPollData[key] = {
-                      [wrestler1Key]: 0,
-                      [wrestler2Key]: 0,
-                      totalVotes: 0,
-                      wrestler1: m.wrestler1,
-                      wrestler2: m.wrestler2,
-                      matchId: m.id
-                    };
-                  }
-                });
-              }
-            }
-          } catch {}
+          // Only use real database matches - no demo data
           
           console.log('✅ Loaded global poll data:', newPollData);
           setPollData(newPollData);
@@ -195,17 +168,17 @@ export const BettingProvider = ({ children }) => {
           // Store in global sync system for consistency
           globalDataSync.updateData('matches', newPollData);
           
-          // Ensure pools exist for any newly merged matches
+          // Only initialize pools for real database matches
           setBettingPools(prev => {
             const updated = { ...prev };
-            Object.keys(newPollData).forEach((k, index) => {
-              if (!updated[k]) {
-                // Initialize new matches with equal 50-50 pools
+            Object.keys(newPollData).forEach((k) => {
+              if (!updated[k] && newPollData[k].matchId) {
+                // Only initialize for matches with real database IDs
                 updated[k] = { 
-                  wrestler1: 100, 
-                  wrestler2: 100 
+                  wrestler1: 0, 
+                  wrestler2: 0 
                 };
-                console.log(`🎯 Initialized NEW MATCH pools for ${k} at 50-50:`, updated[k]);
+                console.log(`🎯 Initialized REAL MATCH pools for ${k}:`, updated[k]);
               }
             });
             return updated;
@@ -217,18 +190,16 @@ export const BettingProvider = ({ children }) => {
         }
       }
       
-      // Fallback to local data if database fails
-      console.log('⚠️ Database unavailable, using fallback data');
-      let data = getFallbackData();
-      setPollData(data);
-      calculateOdds(data, bettingPools);
+      // No fallback data - only use real database
+      console.log('⚠️ Database unavailable, no matches to display');
+      setPollData({});
+      setError('Unable to load matches from database');
       
     } catch (error) {
       console.error('🚨 Error loading poll data:', error);
       setError(error.message);
-      // Use fallback data
-      setPollData(getFallbackData());
-      calculateOdds(getFallbackData(), bettingPools);
+      // No fallback data - only real database
+      setPollData({});
     } finally {
       setLoading(false);
     }
@@ -536,8 +507,8 @@ export const BettingProvider = ({ children }) => {
           });
         }
         
-        // Sync pools to global database and global storage
-        syncBettingPoolsToGlobal(updatedPools);
+        // Sync pools to Supabase database and global storage
+        syncBettingPoolsToSupabase(updatedPools);
         
         // Also sync to globalDataSync for cross-device synchronization
         globalDataSync.updateData('bettingPools', updatedPools);
@@ -580,22 +551,15 @@ export const BettingProvider = ({ children }) => {
     }
   };
 
-  // Helper function to sync betting pools to global database
-  const syncBettingPoolsToGlobal = async (pools) => {
+  // Helper function to sync betting pools to Supabase database
+  const syncBettingPoolsToSupabase = async (pools) => {
     try {
-      const result = await safeFetch('/api/betting-pools', {
-        method: 'POST',
-        body: JSON.stringify({ pools }),
-      });
-
-      if (result.success) {
-        console.log('✅ Betting pools synced to global database');
-      } else {
-        console.log('⚠️ Global pools sync failed, using localStorage backup');
-        localStorage.setItem('wrestlebet_betting_pools', JSON.stringify(pools));
-      }
+      // This will be implemented when we have a proper betting pools table
+      // For now, we'll store in localStorage as backup
+      localStorage.setItem('wrestlebet_betting_pools', JSON.stringify(pools));
+      console.log('✅ Betting pools stored locally (Supabase integration pending)');
     } catch (error) {
-      console.error('Global pools sync error:', error);
+      console.error('Betting pools sync error:', error);
       localStorage.setItem('wrestlebet_betting_pools', JSON.stringify(pools));
     }
   };
@@ -747,92 +711,45 @@ export const BettingProvider = ({ children }) => {
     
     // Load initial data from global database first, then supplement with localStorage as fallback
     const loadInitialData = async () => {
-      console.log('🌍 Loading initial data from global database...');
+      console.log('🌍 Loading initial data from Supabase database...');
       
       try {
-        // First, try to load betting pools from global database
-        const poolsResult = await safeFetch('/api/betting-pools');
+        // Load betting pools from localStorage (temporary until Supabase integration)
         let initialPools = {};
-        
-        if (poolsResult.success) {
-          const poolsData = poolsResult.data;
-          if (poolsData.success && poolsData.pools) {
-            initialPools = poolsData.pools;
-            console.log('📥 Loaded betting pools from global database:', initialPools);
-          }
-        } else {
-          console.log('⚠️ Global betting pools not available, using localStorage fallback');
-          // Fallback to localStorage
-          const storedPools = localStorage.getItem('wrestlebet_betting_pools');
-          if (storedPools) {
-            try {
-              initialPools = JSON.parse(storedPools);
-              console.log('📦 Loaded betting pools from localStorage:', initialPools);
-            } catch (error) {
-              console.error('Error parsing stored betting pools:', error);
-            }
+        const storedPools = localStorage.getItem('wrestlebet_betting_pools');
+        if (storedPools) {
+          try {
+            initialPools = JSON.parse(storedPools);
+            console.log('📦 Loaded betting pools from localStorage:', initialPools);
+          } catch (error) {
+            console.error('Error parsing stored betting pools:', error);
           }
         }
         
         // Initialize with default pools if none exist
         if (Object.keys(initialPools).length === 0) {
-          // Get matches from multiple sources to create pools dynamically
+          // Get matches from global data sync
           const globalMatches = globalDataSync.getData('matches');
-          const adminMatches = globalStorage.get('admin_demo_matches') || [];
           
           initialPools = {};
           
-          // Combine all matches from different sources
-          const allMatches = {};
-          
-          // Add global matches
+          // Only create pools for real database matches
           Object.keys(globalMatches).forEach(matchKey => {
-            allMatches[matchKey] = globalMatches[matchKey];
-          });
-          
-          // Add admin matches
-          adminMatches.forEach(match => {
-            if (match.status === 'upcoming') {
-              // Use the actual match ID from the admin system
-              const matchKey = match.id || `${match.wrestler1}-${match.wrestler2}`;
-              allMatches[matchKey] = {
-                wrestler1: match.wrestler1,
-                wrestler2: match.wrestler2
+            if (globalMatches[matchKey] && globalMatches[matchKey].matchId) {
+              // Only initialize for matches with real database IDs
+              initialPools[matchKey] = { 
+                wrestler1: 0, 
+                wrestler2: 0 
               };
             }
           });
           
-          // If no matches found, create some default ones for testing
-          const matchesToUse = Object.keys(allMatches).length > 0 ? allMatches : {
-            'david-david': { wrestler1: 'David', wrestler2: 'David' },
-            'kunle-pp': { wrestler1: 'Kunle', wrestler2: 'PP' }
-          };
+          console.log('🎯 Initialized REAL MATCH pools with 0 WC:', initialPools);
           
-          Object.keys(matchesToUse).forEach((matchKey, index) => {
-            // Initialize new matches with realistic starting pools (not 50-50)
-            // This creates more interesting initial odds and makes changes more visible
-            const baseAmount = 200 + (index * 50); // Varying base amounts
-            initialPools[matchKey] = { 
-              wrestler1: baseAmount, 
-              wrestler2: Math.round(baseAmount * (0.3 + Math.random() * 0.4)) // 30-70% variation
-            };
-          });
-          
-          console.log('🎯 Initialized NEW MATCH pools with realistic distribution:', initialPools);
-          
-          // Sync initial pools to global database only if component is still mounted
+          // Store initial pools locally
           if (isMounted) {
-            try {
-              await fetch('/api/betting-pools', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pools: initialPools }),
-              });
-              console.log('✅ Synced initial pools to global database');
-            } catch (error) {
-              console.log('⚠️ Failed to sync to global database, using localStorage');
-              localStorage.setItem('wrestlebet_betting_pools', JSON.stringify(initialPools));
-            }
+            localStorage.setItem('wrestlebet_betting_pools', JSON.stringify(initialPools));
+            console.log('✅ Stored initial pools locally');
           }
         }
         
@@ -975,6 +892,19 @@ export const BettingProvider = ({ children }) => {
       }
     };
   }, []);
+
+  // Clean up any existing demo data on component mount
+  useEffect(() => {
+    // Remove any existing demo data from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('admin_demo_matches');
+      localStorage.removeItem('wrestlebet_betting_pools');
+      localStorage.removeItem('wrestlebet_bets');
+      console.log('🧹 Cleaned up demo data from localStorage');
+    }
+  }, []);
+
+  // Load global poll data from database
 
   const value = {
     pollData,

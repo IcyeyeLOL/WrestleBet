@@ -23,25 +23,32 @@ export async function POST(request) {
 
     console.log(`🏆 Admin declaring winner for match ${matchId}: ${winner}`);
 
-    // Get current betting pools and bets from localStorage simulation
-    // In a real app, this would come from your database
-    const bettingPools = {
-      'taylor-yazdani': { wrestler1: 100, wrestler2: 50 },
-      'dake-punia': { wrestler1: 75, wrestler2: 125 },
-      'steveson-petriashvili': { wrestler1: 30, wrestler2: 80 },
-      'chamizo-takahashi': { wrestler1: 60, wrestler2: 90 }
-    };
-
-    // Simulate bets from database
-    const allBets = [
-      { id: '1', matchId: 'taylor-yazdani', wrestler: 'taylor', amount: 50, odds: '2.50', userId: 'user1', status: 'pending' },
-      { id: '2', matchId: 'taylor-yazdani', wrestler: 'yazdani', amount: 30, odds: '1.80', userId: 'user2', status: 'pending' },
-      { id: '3', matchId: 'dake-punia', wrestler: 'dake', amount: 100, odds: '1.75', userId: 'user3', status: 'pending' },
-      { id: '4', matchId: 'steveson-petriashvili', wrestler: 'petriashvili', amount: 75, odds: '1.90', userId: 'user4', status: 'pending' }
-    ];
-
-    // Get all bets for this match
-    const matchBets = allBets.filter(bet => bet.matchId === matchId && bet.status === 'pending');
+    // Get betting pools and bets from database (not hardcoded)
+    let matchBets = [];
+    
+    try {
+      // Load from database if configured, otherwise use empty array
+      const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+      
+      if (supabaseConfigured) {
+        // Get from real database
+        const { supabase } = require('../../../../lib/supabase');
+        const { data: betsData } = await supabase
+          .from('bets')
+          .select('*')
+          .eq('match_id', matchId)
+          .eq('status', 'pending');
+        
+        matchBets = betsData || [];
+      } else {
+        // No hardcoded data - use empty array
+        matchBets = [];
+        console.log('⚠️ Database not configured, no bets to process');
+      }
+    } catch (error) {
+      console.log('⚠️ Error loading bets:', error);
+      matchBets = [];
+    }
     
     if (matchBets.length === 0) {
       return NextResponse.json(

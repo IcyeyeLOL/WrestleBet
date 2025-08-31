@@ -1,5 +1,6 @@
--- UPDATED DATABASE SCHEMA FOR WRESTLEBET WITH WRESTLECOINS CURRENCY SYSTEM
+-- UPDATED DATABASE SCHEMA FOR WRESTLEBET WITH WRESTLECOINS CURRENCY SYSTEM (FIXED VERSION 2)
 -- Run this entire script in Supabase SQL editor
+-- This version handles existing objects gracefully
 
 -- STEP 0: Clean up existing constraints that might conflict
 DO $$ 
@@ -111,29 +112,19 @@ BEGIN
     END IF;
 END $$;
 
--- Add unique constraint for user votes (only if user_id is not null)
-DO $$ 
-BEGIN
-    -- Only create index if both columns exist
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'votes' AND column_name = 'user_id') 
-       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'votes' AND column_name = 'match_id') THEN
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_votes_user_match ON votes(user_id, match_id) WHERE user_id IS NOT NULL;
-    END IF;
-END $$;
-
--- STEP 5: Create Bets table (Enhanced for WrestleCoins)
+-- STEP 5: Create Bets table (Now both users and matches tables exist)
 CREATE TABLE IF NOT EXISTS bets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL,
   match_id UUID NOT NULL,
   wrestler_choice VARCHAR(100) NOT NULL, -- wrestler1 or wrestler2
   amount INTEGER NOT NULL, -- Amount in WrestleCoins
-  odds DECIMAL(5, 2) NOT NULL, -- Odds at time of bet (e.g., 1.85)
-  potential_payout INTEGER NOT NULL, -- Potential WrestleCoins payout
-  actual_payout INTEGER DEFAULT 0, -- Actual payout (if won)
+  odds DECIMAL(4, 2) DEFAULT 1.0, -- Odds when bet was placed
   status VARCHAR(20) DEFAULT 'pending', -- pending, won, lost, cancelled
-  settled_at TIMESTAMP WITH TIME ZONE NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  potential_payout INTEGER, -- Calculated potential payout
+  actual_payout INTEGER, -- Actual payout if won
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Add foreign key constraints separately
@@ -152,54 +143,16 @@ BEGIN
         ALTER TABLE bets ADD CONSTRAINT fk_bets_match 
         FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE;
     END IF;
-END $$;
-
--- STEP 6: Add remaining foreign key constraints (now that all tables exist)
--- Add bet reference to transactions table with data validation
-DO $$ 
-BEGIN
-    -- First, clean any invalid related_bet_id values
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'wrestlecoin_transactions') THEN
-        -- Set invalid bet references to NULL
-        UPDATE wrestlecoin_transactions 
-        SET related_bet_id = NULL 
-        WHERE related_bet_id IS NOT NULL 
-        AND related_bet_id NOT IN (SELECT id FROM bets WHERE id IS NOT NULL);
-        
-        -- Ensure the column is UUID type and allows NULL
-        ALTER TABLE wrestlecoin_transactions 
-        ALTER COLUMN related_bet_id TYPE UUID USING related_bet_id::UUID,
-        ALTER COLUMN related_bet_id DROP NOT NULL;
-    END IF;
     
-    -- Drop existing constraint if it exists
-    IF EXISTS (
-        SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE table_name = 'wrestlecoin_transactions' 
-        AND constraint_name = 'fk_transactions_bet'
-    ) THEN
-        ALTER TABLE wrestlecoin_transactions DROP CONSTRAINT fk_transactions_bet;
-    END IF;
-    
-    -- Add transactions -> bets foreign key with proper validation
+    -- Add transactions -> bets foreign key
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'wrestlecoin_transactions' AND column_name = 'related_bet_id') 
        AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bets' AND column_name = 'id') THEN
-        
-        -- Verify data types match
-        IF (SELECT data_type FROM information_schema.columns WHERE table_name = 'wrestlecoin_transactions' AND column_name = 'related_bet_id') = 
-           (SELECT data_type FROM information_schema.columns WHERE table_name = 'bets' AND column_name = 'id') THEN
-            
-            ALTER TABLE wrestlecoin_transactions ADD CONSTRAINT fk_transactions_bet 
-            FOREIGN KEY (related_bet_id) REFERENCES bets(id) ON DELETE SET NULL;
-            
-        ELSE
-            RAISE NOTICE 'Data type mismatch between related_bet_id and bets.id - skipping foreign key constraint';
-        END IF;
+        ALTER TABLE wrestlecoin_transactions ADD CONSTRAINT fk_transactions_bet 
+        FOREIGN KEY (related_bet_id) REFERENCES bets(id) ON DELETE SET NULL;
     END IF;
 END $$;
 
--- STEP 7: Create Currency Settings table (For system configuration)
+-- STEP 6: Create Currency Settings table
 CREATE TABLE IF NOT EXISTS currency_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   setting_name VARCHAR(50) UNIQUE NOT NULL,
@@ -209,7 +162,7 @@ CREATE TABLE IF NOT EXISTS currency_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- STEP 8: Insert default currency settings (FIXED - uses ON CONFLICT to handle duplicates)
+-- STEP 7: Insert default currency settings (FIXED - uses ON CONFLICT to handle duplicates)
 INSERT INTO currency_settings (setting_name, setting_value, description) VALUES
 ('starting_balance', '1000', 'Default WrestleCoins balance for new users'),
 ('daily_bonus_amount', '50', 'Daily login bonus in WrestleCoins'),
@@ -223,10 +176,11 @@ ON CONFLICT (setting_name) DO UPDATE
     description = EXCLUDED.description,
     updated_at = NOW();
 
--- STEP 9: Sample matches removed - Use admin panel to create matches
+-- STEP 8: Insert sample matches (Enhanced)
+-- Sample matches removed - Use admin panel to create matches
 -- Hardcoded matches eliminated for fully dynamic system
 
--- STEP 10: Create indexes for better performance
+-- STEP 9: Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON wrestlecoin_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON wrestlecoin_transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON wrestlecoin_transactions(category);
@@ -239,7 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_bets_status ON bets(status);
 CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status);
 CREATE INDEX IF NOT EXISTS idx_matches_match_date ON matches(match_date);
 
--- STEP 11: Create update triggers for timestamp fields (FIXED - handles existing triggers)
+-- STEP 10: Create update triggers for timestamp fields (FIXED - handles existing triggers)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -265,7 +219,7 @@ DROP TRIGGER IF EXISTS update_currency_settings_updated_at ON currency_settings;
 CREATE TRIGGER update_currency_settings_updated_at BEFORE UPDATE ON currency_settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- STEP 12: Create helpful views
+-- STEP 11: Create helpful views
 CREATE OR REPLACE VIEW user_stats AS
 SELECT 
     u.id,
@@ -285,7 +239,7 @@ FROM users u
 LEFT JOIN bets b ON u.id = b.user_id
 GROUP BY u.id, u.username, u.wrestlecoin_balance, u.total_winnings, u.total_spent;
 
--- STEP 13: Diagnostic information and validation
+-- STEP 12: Diagnostic information and validation
 DO $$ 
 DECLARE
     transactions_related_bet_type text;
@@ -316,7 +270,3 @@ BEGIN
     
     RAISE NOTICE 'Schema setup completed successfully!';
 END $$;
-
--- STEP 14: Sample user for testing (OPTIONAL - for development only)
--- INSERT INTO users (username, email, wrestlecoin_balance) VALUES
--- ('test_user', 'test@wrestlebet.com', 1000);

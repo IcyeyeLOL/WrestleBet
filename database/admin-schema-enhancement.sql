@@ -69,9 +69,22 @@ CREATE TABLE IF NOT EXISTS betting_analytics (
   recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- STEP 6: Add Foreign Key Constraints
+-- STEP 6: Add Foreign Key Constraints (with safe handling)
 DO $$ 
 BEGIN
+    -- Drop existing constraints first to avoid conflicts
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_admin_logs_user') THEN
+        ALTER TABLE admin_logs DROP CONSTRAINT fk_admin_logs_user;
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_user_analytics_user') THEN
+        ALTER TABLE user_analytics DROP CONSTRAINT fk_user_analytics_user;
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_betting_analytics_match') THEN
+        ALTER TABLE betting_analytics DROP CONSTRAINT fk_betting_analytics_match;
+    END IF;
+
     -- Admin logs user reference
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'admin_logs' AND column_name = 'admin_user_id') 
        AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'id') THEN
@@ -92,6 +105,9 @@ BEGIN
         ALTER TABLE betting_analytics ADD CONSTRAINT fk_betting_analytics_match 
         FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE;
     END IF;
+    
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Note: Some constraints may already exist - continuing with schema updates';
 END $$;
 
 -- STEP 7: Insert Default System Settings
@@ -132,12 +148,39 @@ ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE betting_analytics ENABLE ROW LEVEL SECURITY;
 
--- Create RLS Policies (Admin access only)
-CREATE POLICY "Admin can view all admin logs" ON admin_logs FOR SELECT USING (auth.uid()::text = admin_user_id::text);
-CREATE POLICY "Admin can insert admin logs" ON admin_logs FOR INSERT WITH CHECK (auth.uid()::text = admin_user_id::text);
+-- Create RLS Policies (with safe handling of existing policies)
+DO $$ 
+BEGIN
+    -- Drop existing policies first to avoid conflicts
+    DROP POLICY IF EXISTS "Admin can view all admin logs" ON admin_logs;
+    DROP POLICY IF EXISTS "Admin can insert admin logs" ON admin_logs;
+    DROP POLICY IF EXISTS "Admin can view system settings" ON system_settings;
+    DROP POLICY IF EXISTS "Admin can update system settings" ON system_settings;
+    DROP POLICY IF EXISTS "Users can view their analytics" ON user_analytics;
+    DROP POLICY IF EXISTS "Admin can view betting analytics" ON betting_analytics;
+    
+    -- Create new policies
+    CREATE POLICY "Admin can view all admin logs" ON admin_logs 
+      FOR SELECT USING (auth.uid()::text = admin_user_id::text);
+      
+    CREATE POLICY "Admin can insert admin logs" ON admin_logs 
+      FOR INSERT WITH CHECK (auth.uid()::text = admin_user_id::text);
 
-CREATE POLICY "Admin can view system settings" ON system_settings FOR SELECT USING (true);
-CREATE POLICY "Admin can update system settings" ON system_settings FOR UPDATE USING (true);
+    CREATE POLICY "Admin can view system settings" ON system_settings 
+      FOR SELECT USING (true);
+      
+    CREATE POLICY "Admin can update system settings" ON system_settings 
+      FOR UPDATE USING (true);
+      
+    CREATE POLICY "Users can view their analytics" ON user_analytics 
+      FOR SELECT USING (auth.uid() = user_id);
+      
+    CREATE POLICY "Admin can view betting analytics" ON betting_analytics 
+      FOR SELECT USING (true);
+      
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Note: Some RLS policies may already exist - continuing with schema updates';
+END $$;
 
 -- Success message
 SELECT 'Admin schema enhancement completed successfully!' as status;

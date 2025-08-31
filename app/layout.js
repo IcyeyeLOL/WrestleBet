@@ -18,7 +18,13 @@ const robotoMono = Roboto_Mono({
 export const metadata = {
   title: "WrestleBet - Wrestling Betting Platform",
   description: "Bet on wrestling matches with WrestleCoins",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }) {

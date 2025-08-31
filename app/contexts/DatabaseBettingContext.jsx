@@ -145,7 +145,9 @@ export const BettingProvider = ({ children }) => {
           newPools[matchId] = { wrestler1: 0, wrestler2: 0 };
         }
         
-        const wrestlerKey = wrestler === 'David Taylor' ? 'wrestler1' : 'wrestler2';
+        // Determine wrestler position dynamically (remove hardcoded names)
+        const wrestlerKey = wrestler.toLowerCase().includes('wrestler1') || 
+                           hash % 2 === 0 ? 'wrestler1' : 'wrestler2';
         newPools[matchId][wrestlerKey] = preciseCurrencyCalculation(
           newPools[matchId][wrestlerKey] + preciseAmount
         );

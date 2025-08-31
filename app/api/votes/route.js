@@ -3,46 +3,7 @@ import { supabase } from '../../../lib/supabase'
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-
-
 const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// Merge admin-demo matches from localStorage via cookie-less approach is not possible on server.
-// To allow quick demo sync, also read from an in-memory env var string if provided.
-// Developers can set NEXT_PUBLIC_ADMIN_DEMO_MATCHES with JSON array.
-const demoMatchesBase = [
-  {
-    id: 'demo-1',
-    wrestler1: 'David Taylor',
-    wrestler2: 'Hassan Yazdani',
-    voteCounts: { 'David Taylor': 45, 'Hassan Yazdani': 55 },
-    totalVotes: 100,
-    event_name: 'World Wrestling Championship',
-    weight_class: '86kg',
-    status: 'upcoming'
-  },
-  {
-    id: 'demo-2',
-    wrestler1: 'Kyle Dake',
-    wrestler2: 'Frank Chamizo',
-    voteCounts: { 'Kyle Dake': 60, 'Frank Chamizo': 40 },
-    totalVotes: 100,
-    event_name: 'Olympic Trials',
-    weight_class: '74kg',
-    status: 'upcoming'
-  }
-];
-
-const getDemoMatches = () => {
-  try {
-    const injected = process.env.NEXT_PUBLIC_ADMIN_DEMO_MATCHES;
-    if (injected) {
-      const parsed = JSON.parse(injected);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {}
-  return demoMatchesBase;
-};
 
 export async function POST(request) {
   try {
@@ -50,71 +11,59 @@ export async function POST(request) {
 
     // Check if Supabase is configured
     if (!supabaseConfigured) {
-      // Return success response for demo mode
-      return Response.json({
-        success: true,
-        votes: { [wrestlerChoice]: 1 },
-        totalVotes: 1
-      })
+      return Response.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      )
     }
 
-    try {
-      // Check if user already voted for this match
-      const { data: existingVote } = await supabase
+    // Check if user already voted for this match
+    const { data: existingVote } = await supabase
+      .from('votes')
+      .select('id')
+      .eq('match_id', matchId)
+      .eq('user_ip', userIp)
+      .single()
+
+    if (existingVote) {
+      // Update existing vote
+      const { error } = await supabase
         .from('votes')
-        .select('id')
-        .eq('match_id', matchId)
-        .eq('user_ip', userIp)
-        .single()
+        .update({ wrestler_choice: wrestlerChoice })
+        .eq('id', existingVote.id)
 
-      if (existingVote) {
-        // Update existing vote
-        const { error } = await supabase
-          .from('votes')
-          .update({ wrestler_choice: wrestlerChoice })
-          .eq('id', existingVote.id)
-
-        if (error) throw error
-      } else {
-        // Create new vote
-        const { error } = await supabase
-          .from('votes')
-          .insert({
-            match_id: matchId,
-            wrestler_choice: wrestlerChoice,
-            user_ip: userIp
-          })
-
-        if (error) throw error
-      }
-
-      // Get updated vote counts
-      const { data: votes, error: votesError } = await supabase
+      if (error) throw error
+    } else {
+      // Create new vote
+      const { error } = await supabase
         .from('votes')
-        .select('wrestler_choice')
-        .eq('match_id', matchId)
+        .insert({
+          match_id: matchId,
+          wrestler_choice: wrestlerChoice,
+          user_ip: userIp
+        })
 
-      if (votesError) throw votesError
-
-      const voteCounts = votes.reduce((acc, vote) => {
-        acc[vote.wrestler_choice] = (acc[vote.wrestler_choice] || 0) + 1
-        return acc
-      }, {})
-
-      return Response.json({
-        success: true,
-        votes: voteCounts,
-        totalVotes: votes.length
-      })
-    } catch (dbError) {
-      console.log('⚠️ Database error, returning demo response:', dbError.message);
-      // Return success response for demo mode when database fails
-      return Response.json({
-        success: true,
-        votes: { [wrestlerChoice]: 1 },
-        totalVotes: 1
-      })
+      if (error) throw error
     }
+
+    // Get updated vote counts
+    const { data: votes, error: votesError } = await supabase
+      .from('votes')
+      .select('wrestler_choice')
+      .eq('match_id', matchId)
+
+    if (votesError) throw votesError
+
+    const voteCounts = votes.reduce((acc, vote) => {
+      acc[vote.wrestler_choice] = (acc[vote.wrestler_choice] || 0) + 1
+      return acc
+    }, {})
+
+    return Response.json({
+      success: true,
+      votes: voteCounts,
+      totalVotes: votes.length
+    })
   } catch (error) {
     console.error('❌ Votes POST API error:', error);
     return Response.json(
@@ -129,90 +78,80 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const matchId = searchParams.get('matchId')
 
+    if (!supabaseConfigured) {
+      return Response.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      )
+    }
+
     if (matchId) {
-      if (!supabaseConfigured) {
-        const match = getDemoMatches().find(m => m.id === matchId);
-        if (!match) {
-          return Response.json({ success: false, error: 'Not found' }, { status: 404 })
-        }
-        return Response.json({ success: true, votes: match.voteCounts, totalVotes: match.totalVotes })
-      }
-      
-      try {
-        // Get votes for specific match
-        const { data: votes, error } = await supabase
-          .from('votes')
-          .select('wrestler_choice')
-          .eq('match_id', matchId)
+      // Get votes for specific match
+      const { data: votes, error } = await supabase
+        .from('votes')
+        .select('wrestler_choice')
+        .eq('match_id', matchId)
 
-        if (error) throw error
+      if (error) throw error
 
-        // Count votes for each wrestler
-        const voteCounts = votes.reduce((acc, vote) => {
-          acc[vote.wrestler_choice] = (acc[vote.wrestler_choice] || 0) + 1
-          return acc
-        }, {})
+      // Count votes for each wrestler
+      const voteCounts = votes.reduce((acc, vote) => {
+        acc[vote.wrestler_choice] = (acc[vote.wrestler_choice] || 0) + 1
+        return acc
+      }, {})
 
-        return Response.json({
-          success: true,
-          votes: voteCounts,
-          totalVotes: votes.length
-        })
-      } catch (dbError) {
-        console.log('⚠️ Database error, falling back to demo data:', dbError.message);
-        const match = getDemoMatches().find(m => m.id === matchId);
-        if (!match) {
-          return Response.json({ success: false, error: 'Not found' }, { status: 404 })
-        }
-        return Response.json({ success: true, votes: match.voteCounts, totalVotes: match.totalVotes })
-      }
+      return Response.json({
+        success: true,
+        votes: voteCounts,
+        totalVotes: votes.length
+      })
     } else {
-      if (!supabaseConfigured) {
-        return Response.json({ success: true, matches: getDemoMatches() })
-      }
-      
-      try {
-        // Get all matches with vote counts
-        const { data: matches, error } = await supabase
-          .from('matches')
-          .select(`
-            *,
-            votes (wrestler_choice)
-          `)
+      // Get all matches with vote counts
+      const { data: matches, error: matchesError } = await supabase
+        .from('matches')
+        .select('*')
+        .in('status', ['active', 'upcoming'])
+        .order('created_at', { ascending: false })
 
-        if (error) throw error
+      if (matchesError) throw matchesError
 
-        const matchesWithVotes = matches.map(match => {
-          // Ensure votes is an array, handle null/undefined case
-          const votes = Array.isArray(match.votes) ? match.votes : [];
-          
-          const voteCounts = votes.reduce((acc, vote) => {
-            if (vote && vote.wrestler_choice) {
-              acc[vote.wrestler_choice] = (acc[vote.wrestler_choice] || 0) + 1;
-            }
-            return acc;
-          }, {});
+      // Get all votes for all matches
+      const { data: allVotes, error: votesError } = await supabase
+        .from('votes')
+        .select('match_id, wrestler_choice')
 
-          return {
-            ...match,
-            votes: votes, // Keep as array for frontend
-            voteCounts: voteCounts, // Add processed counts
-            totalVotes: votes.length
-          };
-        });
+      if (votesError) throw votesError
 
-        return Response.json({
-          success: true,
-          matches: matchesWithVotes
-        })
-      } catch (dbError) {
-        console.log('⚠️ Database error, falling back to demo data:', dbError.message);
-        return Response.json({ success: true, matches: getDemoMatches() })
-      }
+      // Process matches with vote counts
+      const matchesWithVotes = matches.map(match => {
+        // Filter votes for this specific match
+        const matchVotes = allVotes.filter(vote => vote.match_id === match.id);
+        
+        const voteCounts = matchVotes.reduce((acc, vote) => {
+          if (vote && vote.wrestler_choice) {
+            acc[vote.wrestler_choice] = (acc[vote.wrestler_choice] || 0) + 1;
+          }
+          return acc;
+        }, {});
+
+        return {
+          ...match,
+          votes: matchVotes, // Keep as array for frontend
+          voteCounts: voteCounts, // Add processed counts
+          totalVotes: matchVotes.length
+        };
+      });
+
+      return Response.json({
+        success: true,
+        matches: matchesWithVotes
+      })
     }
   } catch (error) {
     console.error('❌ Votes API error:', error);
-    // Always return demo data on any error to prevent network failures
-    return Response.json({ success: true, matches: getDemoMatches() })
+    return Response.json(
+      { success: false, error: 'Failed to fetch votes' },
+      { status: 500 }
+    )
   }
 }

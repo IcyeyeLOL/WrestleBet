@@ -95,8 +95,11 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Insert new match (without is_featured column)
-    const { data: match, error } = await supabase
+    // Use regular supabase client (admin functionality through database policies)
+    const dbClient = supabase;
+
+    // Insert new match
+    const { data: match, error } = await dbClient
       .from('matches')
       .insert({
         wrestler1,
@@ -106,7 +109,8 @@ export async function POST(request) {
         match_date: matchDate ? new Date(matchDate).toISOString() : null,
         description,
         created_by_admin: adminUserId,
-        status: 'upcoming'
+        status: 'upcoming',
+        total_bet_pool: 0
       })
       .select()
       .single();
@@ -116,18 +120,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    // Log admin action (commented out to avoid missing table errors)
-    // if (adminUserId) {
-    //   await supabase
-    //     .from('admin_logs')
-    //     .insert({
-    //       admin_user_id: adminUserId,
-    //       action_type: 'match_created',
-    //       resource_type: 'match',
-    //       resource_id: match.id,
-    //       details: { wrestler1, wrestler2, eventName }
-    //     });
-    // }
+    console.log('✅ Match created successfully:', match);
 
     return NextResponse.json({
       success: true,
@@ -167,8 +160,11 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    // Update match (without is_featured column)
-    const { data: match, error } = await supabase
+    // Use regular supabase client (admin functionality through database policies)
+    const dbClient = supabase;
+
+    // Update match
+    const { data: match, error } = await dbClient
       .from('matches')
       .update({
         wrestler1,
@@ -188,19 +184,6 @@ export async function PUT(request) {
       console.error('Error updating match:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
-
-    // Log admin action (commented out to avoid missing table errors)
-    // if (adminUserId) {
-    //   await supabase
-    //     .from('admin_logs')
-    //     .insert({
-    //       admin_user_id: adminUserId,
-    //       action_type: 'match_updated',
-    //       resource_type: 'match',
-    //       resource_id: id,
-    //       details: { wrestler1, wrestler2, status }
-    //     });
-    // }
 
     return NextResponse.json({
       success: true,
@@ -232,42 +215,70 @@ export async function DELETE(request) {
       }, { status: 400 });
     }
 
+    console.log(`🗑️ Admin attempting to delete match ${id}`);
+
+    // Use regular supabase client (RLS policies should be permissive enough)
+    const dbClient = supabase;
+
+    // First, get the match to check if it exists and log details
+    const { data: matchToDelete, error: fetchError } = await dbClient
+      .from('matches')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching match to delete:', fetchError);
+      return NextResponse.json({ success: false, error: `Match not found: ${fetchError.message}` }, { status: 404 });
+    }
+
+    console.log(`📊 Match details: ${matchToDelete.wrestler1} vs ${matchToDelete.wrestler2}`);
+
     // Check if match has bets (prevent deletion if bets exist)
-    const { data: bets } = await supabase
+    const { data: bets, error: betsError } = await dbClient
       .from('bets')
       .select('id')
       .eq('match_id', id);
 
-    if (bets && bets.length > 0) {
+    if (betsError) {
+      console.error('Error checking bets:', betsError);
+      // Continue with deletion even if we can't check bets
+    } else if (bets && bets.length > 0) {
+      console.log(`⚠️ Match has ${bets.length} bets, preventing deletion`);
       return NextResponse.json({ 
         success: false, 
-        error: 'Cannot delete match with existing bets' 
+        error: `Cannot delete match with existing bets (${bets.length} bets found)` 
       }, { status: 400 });
     }
 
-    // Delete match
-    const { error } = await supabase
+    // Delete related votes first to avoid foreign key constraints
+    const { error: votesDeleteError } = await dbClient
+      .from('votes')
+      .delete()
+      .eq('match_id', id);
+
+    if (votesDeleteError) {
+      console.error('Error deleting related votes:', votesDeleteError);
+      // Continue anyway - votes deletion is not critical
+    } else {
+      console.log('✅ Deleted related votes');
+    }
+
+    // Delete the match
+    const { error: deleteError } = await dbClient
       .from('matches')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      console.error('Error deleting match:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (deleteError) {
+      console.error('Error deleting match:', deleteError);
+      return NextResponse.json({ 
+        success: false, 
+        error: `Failed to delete match: ${deleteError.message}` 
+      }, { status: 500 });
     }
 
-    // Log admin action (commented out to avoid missing table errors)
-    // if (adminUserId) {
-    //   await supabase
-    //     .from('admin_logs')
-    //     .insert({
-    //       admin_user_id: adminUserId,
-    //       action_type: 'match_deleted',
-    //       resource_type: 'match',
-    //       resource_id: id,
-    //       details: { action: 'deleted' }
-    //     });
-    // }
+    console.log('✅ Match deleted successfully');
 
     return NextResponse.json({
       success: true,
@@ -276,6 +287,9 @@ export async function DELETE(request) {
 
   } catch (error) {
     console.error('Admin match deletion error:', error);
-    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: `Internal server error: ${error.message}` 
+    }, { status: 500 });
   }
 }

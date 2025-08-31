@@ -1,7 +1,7 @@
 // Global Data Synchronization System
 // Ensures all data is consistent across users, devices, and platforms
 
-import { safeFetch, isDemoMode, getDemoFallback } from './safeFetch.js';
+import { safeFetch } from './safeFetch.js';
 
 class GlobalDataSync {
   constructor() {
@@ -78,11 +78,7 @@ class GlobalDataSync {
   async syncWithServer() {
     if (!this.isOnline || this.syncInProgress) return false;
     
-    // Check if we're in demo mode
-    if (isDemoMode()) {
-      console.log('📱 Demo mode detected, skipping server sync');
-      return false;
-    }
+    // Always sync with server - no demo mode
     
     this.syncInProgress = true;
     
@@ -95,11 +91,17 @@ class GlobalDataSync {
         console.log('⚠️ Matches sync failed, using local data');
       }
 
-      // Sync betting pools with safe fetch
-      const poolsResult = await safeFetch('/api/betting-pools');
-      if (poolsResult.success && poolsResult.data?.pools) {
-        this.updateData('bettingPools', poolsResult.data.pools);
-      } else {
+      // Sync betting pools from localStorage (temporary until Supabase integration)
+      try {
+        const storedPools = localStorage.getItem('wrestlebet_betting_pools');
+        if (storedPools) {
+          const pools = JSON.parse(storedPools);
+          this.updateData('bettingPools', pools);
+          console.log('📦 Loaded betting pools from localStorage');
+        } else {
+          console.log('⚠️ No betting pools found in localStorage');
+        }
+      } catch (error) {
         console.log('⚠️ Pools sync failed, using local data');
       }
 

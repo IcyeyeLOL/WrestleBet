@@ -1,5 +1,6 @@
 -- CLEAN WRESTLEBET SCHEMA WITH CONSISTENT UUID TYPES
--- This version ensures all primary keys use UUID consistently
+-- This version ensures all primary keys use U-- Sample matches removed - Use admin panel to create matches
+-- Hardcoded matches eliminated for fully dynamic systemonsistently
 
 -- STEP 0: Clean slate (OPTIONAL - only if you want to start completely fresh)
 -- DROP TABLE IF EXISTS bets CASCADE;
@@ -98,13 +99,8 @@ INSERT INTO currency_settings (setting_name, setting_value, description) VALUES
 ('currency_symbol', 'WC', 'Symbol for the virtual currency')
 ON CONFLICT (setting_name) DO NOTHING;
 
--- STEP 8: Insert sample matches
-INSERT INTO matches (wrestler1, wrestler2, event_name, weight_class, match_date) VALUES
-('David Taylor', 'Hassan Yazdani', 'World Wrestling Championships 2025', '86kg', NOW() + INTERVAL '7 days'),
-('Kyle Dake', 'Bajrang Punia', 'European Championships', '65kg', NOW() + INTERVAL '14 days'),
-('Gable Steveson', 'Geno Petriashvili', 'Pan American Championships', '125kg', NOW() + INTERVAL '21 days'),
-('Frank Chamizo', 'Yuki Takahashi', 'Asian Championships', '74kg', NOW() + INTERVAL '28 days')
-ON CONFLICT DO NOTHING;
+-- STEP 8: Sample matches removed - Use admin panel to create matches
+-- Hardcoded matches eliminated for fully dynamic system
 
 -- STEP 9: Create indexes
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON wrestlecoin_transactions(user_id);

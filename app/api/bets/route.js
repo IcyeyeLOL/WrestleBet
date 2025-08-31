@@ -65,7 +65,7 @@ export async function POST(request) {
           user_id: userId,
           match_id: matchId,
           wrestler_choice: wrestlerChoice,
-          bet_amount: betAmount,
+          amount: betAmount, // Changed from bet_amount to amount
           odds: odds,
           status: 'pending'
         })
@@ -77,29 +77,75 @@ export async function POST(request) {
         throw new Error(`Failed to create bet: ${error.message}`)
       }
 
-      // Calculate new odds based on betting volume
+      // CRITICAL: Update match table with new odds and pools
+      // This should trigger the database function to recalculate odds
+      console.log('🔄 Triggering match odds update for match:', matchId);
+      
+      // Call the database function to recalculate odds
+      const { data: oddsUpdate, error: oddsError } = await supabase
+        .rpc('calculate_match_odds', { match_id: matchId });
+
+      if (oddsError) {
+        console.warn('⚠️ Warning: Could not update match odds:', oddsError.message);
+      } else {
+        console.log('✅ Match odds updated:', oddsUpdate);
+      }
+
+      // Manually update the match table with recalculated values
       const { data: allBets, error: betsError } = await supabase
         .from('bets')
-        .select('wrestler_choice, bet_amount')
+        .select('wrestler_choice, amount')
         .eq('match_id', matchId)
+        .eq('status', 'pending');
 
-      if (betsError) throw betsError
+      if (betsError) throw betsError;
 
-      // Calculate total money on each wrestler
-      const wrestlerTotals = allBets.reduce((acc, bet) => {
-        acc[bet.wrestler_choice] = (acc[bet.wrestler_choice] || 0) + parseFloat(bet.bet_amount)
-        return acc
-      }, {})
+      // Calculate pool totals
+      const wrestler1Pool = allBets
+        .filter(bet => bet.wrestler_choice === 'wrestler1')
+        .reduce((sum, bet) => sum + parseFloat(bet.amount || 0), 0);
+      
+      const wrestler2Pool = allBets
+        .filter(bet => bet.wrestler_choice === 'wrestler2')
+        .reduce((sum, bet) => sum + parseFloat(bet.amount || 0), 0);
+      
+      const totalPool = wrestler1Pool + wrestler2Pool;
 
-      const totalPool = Object.values(wrestlerTotals).reduce((sum, amount) => sum + amount, 0)
+      // Calculate dynamic odds (minimum 1.10)
+      const odds1 = wrestler1Pool > 0 ? Math.max(1.10, totalPool / wrestler1Pool) : 1.10;
+      const odds2 = wrestler2Pool > 0 ? Math.max(1.10, totalPool / wrestler2Pool) : 1.10;
 
-      // Calculate new odds (simplified odds calculation)
-      const newOdds = {}
-      Object.keys(wrestlerTotals).forEach(wrestler => {
-        const wrestlerShare = wrestlerTotals[wrestler] / totalPool
-        // More money on a wrestler = lower odds (more likely to win)
-        newOdds[wrestler] = Math.max(1.1, 2.0 - wrestlerShare).toFixed(2)
-      })
+      // Update match table with new odds and pools
+      const { error: matchUpdateError } = await supabase
+        .from('matches')
+        .update({
+          odds_wrestler1: odds1.toFixed(2),
+          odds_wrestler2: odds2.toFixed(2),
+          total_pool: totalPool
+        })
+        .eq('id', matchId);
+
+      if (matchUpdateError) {
+        console.warn('⚠️ Warning: Could not update match table:', matchUpdateError.message);
+      } else {
+        console.log('✅ Match table updated with new odds and pool:', {
+          matchId,
+          odds1: odds1.toFixed(2),
+          odds2: odds2.toFixed(2),
+          totalPool
+        });
+      }
+
+      // Calculate final response data
+      const wrestlerTotals = {
+        wrestler1: wrestler1Pool,
+        wrestler2: wrestler2Pool
+      };
+
+      const newOdds = {
+        wrestler1: odds1.toFixed(2),
+        wrestler2: odds2.toFixed(2)
+      };
 
       return Response.json({
         success: true,
