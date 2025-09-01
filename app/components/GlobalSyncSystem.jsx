@@ -79,8 +79,8 @@ const GlobalSyncSystem = () => {
         const wrestler2Total = wrestler2Bets.reduce((sum, bet) => sum + bet.amount, 0);
 
         // Calculate odds (simplified formula)
-        const wrestler1Odds = totalPool > 0 ? (totalPool / wrestler1Total).toFixed(2) : 1.0;
-        const wrestler2Odds = totalPool > 0 ? (totalPool / wrestler2Total).toFixed(2) : 1.0;
+        const wrestler1Odds = totalPool > 0 ? (totalPool / wrestler1Total).toFixed(1) : 1.0;
+        const wrestler2Odds = totalPool > 0 ? (totalPool / wrestler2Total).toFixed(1) : 1.0;
 
         // Update match with new odds
         supabase

@@ -72,11 +72,11 @@ export const BettingProvider = ({ children }) => {
     
     // Calculate dynamic odds based on pool distribution
     const wrestler1Odds = matchPools.wrestler1 > 0 
-      ? Math.max(1.10, (totalPoolWC / matchPools.wrestler1)).toFixed(2) 
-      : '10.00';
+      ? Math.max(1.10, (totalPoolWC / matchPools.wrestler1)).toFixed(1) 
+      : '10.0';
     const wrestler2Odds = matchPools.wrestler2 > 0 
-      ? Math.max(1.10, (totalPoolWC / matchPools.wrestler2)).toFixed(2) 
-      : '10.00';
+      ? Math.max(1.10, (totalPoolWC / matchPools.wrestler2)).toFixed(1) 
+      : '10.0';
     
     // Get match data for wrestler names - use override if provided, otherwise use pollData
     const matchData = matchDataOverride || pollData[matchId];
@@ -226,11 +226,11 @@ export const BettingProvider = ({ children }) => {
         const w2WC = pools[matchKey].wrestler2;
         // When there's 0 WC in the pool, both wrestlers get the same odds (2.00)
         if (totalWC === 0) {
-          newOdds[matchKey][key1] = '2.00';
-          newOdds[matchKey][key2] = '2.00';
+          newOdds[matchKey][key1] = '2.0';
+          newOdds[matchKey][key2] = '2.0';
         } else {
-          newOdds[matchKey][key1] = w1WC > 0 ? Math.max(1.10, (totalWC / w1WC)).toFixed(2) : '2.00';
-          newOdds[matchKey][key2] = w2WC > 0 ? Math.max(1.10, (totalWC / w2WC)).toFixed(2) : '2.00';
+          newOdds[matchKey][key1] = w1WC > 0 ? Math.max(1.10, (totalWC / w1WC)).toFixed(1) : '2.0';
+          newOdds[matchKey][key2] = w2WC > 0 ? Math.max(1.10, (totalWC / w2WC)).toFixed(1) : '2.0';
         }
         
         console.log(`✅ WC-based odds for ${matchKey}:`, newOdds[matchKey]);
@@ -246,10 +246,10 @@ export const BettingProvider = ({ children }) => {
               // Standard odds calculation: total votes / wrestler votes
               const baseOdds = totalVotes / votes;
               // Apply minimum odds and some variation
-              newOdds[matchKey][wrestler] = Math.max(1.10, baseOdds).toFixed(2);
+              newOdds[matchKey][wrestler] = Math.max(1.10, baseOdds).toFixed(1);
             } else {
               // Default odds when no votes
-              newOdds[matchKey][wrestler] = '2.00';
+              newOdds[matchKey][wrestler] = '2.0';
             }
           }
         });
@@ -499,17 +499,17 @@ export const BettingProvider = ({ children }) => {
           const wrestler1Amount = matchPools.wrestler1 || 0;
           const wrestler2Amount = matchPools.wrestler2 || 0;
           
-          let wrestler1Odds = '10.00';
-          let wrestler2Odds = '10.00';
+          let wrestler1Odds = '10.0';
+          let wrestler2Odds = '10.0';
           
           if (wrestler1Amount > 0 && !isNaN(wrestler1Amount)) {
             const calculatedOdds = totalPoolWC / wrestler1Amount;
-            wrestler1Odds = isNaN(calculatedOdds) ? '10.00' : Math.max(1.10, calculatedOdds).toFixed(2);
+            wrestler1Odds = isNaN(calculatedOdds) ? '10.0' : Math.max(1.10, calculatedOdds).toFixed(1);
           }
           
           if (wrestler2Amount > 0 && !isNaN(wrestler2Amount)) {
             const calculatedOdds = totalPoolWC / wrestler2Amount;
-            wrestler2Odds = isNaN(calculatedOdds) ? '10.00' : Math.max(1.10, calculatedOdds).toFixed(2);
+            wrestler2Odds = isNaN(calculatedOdds) ? '10.0' : Math.max(1.10, calculatedOdds).toFixed(1);
           }
           
           // Use position-based keys for odds

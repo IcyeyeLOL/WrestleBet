@@ -66,8 +66,8 @@ const RealWrestleCoinSystem = () => {
           total: totalPool,
           wrestler1: wrestler1Pool,
           wrestler2: wrestler2Pool,
-          odds1: totalPool > 0 ? (totalPool / wrestler1Pool).toFixed(2) : 1.0,
-          odds2: totalPool > 0 ? (totalPool / wrestler2Pool).toFixed(2) : 1.0
+          odds1: totalPool > 0 ? (totalPool / wrestler1Pool).toFixed(1) : 1.0,
+          odds2: totalPool > 0 ? (totalPool / wrestler2Pool).toFixed(1) : 1.0
         };
       }
 

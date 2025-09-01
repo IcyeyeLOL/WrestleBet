@@ -156,8 +156,8 @@ export async function POST(request) {
       const { error: matchUpdateError } = await supabase
         .from('matches')
         .update({
-          odds_wrestler1: odds1.toFixed(2),
-          odds_wrestler2: odds2.toFixed(2),
+          odds_wrestler1: odds1.toFixed(1),
+          odds_wrestler2: odds2.toFixed(1),
           wrestler1_pool: wrestler1Pool,
           wrestler2_pool: wrestler2Pool,
           total_pool: totalPool,
@@ -179,8 +179,8 @@ export async function POST(request) {
       };
 
       const newOdds = {
-        wrestler1: odds1.toFixed(2),
-        wrestler2: odds2.toFixed(2)
+        wrestler1: odds1.toFixed(1),
+        wrestler2: odds2.toFixed(1)
       };
 
       const response = {

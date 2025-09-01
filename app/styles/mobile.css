@@ -2,6 +2,21 @@
 
 /* Mobile-specific improvements */
 @media (max-width: 640px) {
+  /* Compact header styles */
+  .mobile-header-compact {
+    padding: 0.5rem 0.75rem;
+    min-height: 56px;
+  }
+  
+  .mobile-logo-compact {
+    font-size: 1.125rem;
+    line-height: 1.2;
+  }
+  
+  .mobile-controls-compact {
+    gap: 0.25rem;
+  }
+  
   .mobile-optimized-card {
     padding: 1rem;
     margin: 0 0.5rem;

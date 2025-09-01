@@ -212,7 +212,7 @@ const FrontPage = () => {
           if (totalPool > 0) {
             odds1 = wrestler1Pool > 0 ? Math.max(1.10, totalPool / wrestler1Pool) : 1.10;
             odds2 = wrestler2Pool > 0 ? Math.max(1.10, totalPool / wrestler2Pool) : 1.10;
-            console.log(`🎲 Using calculated odds for ${match.id}: ${odds1.toFixed(2)} / ${odds2.toFixed(2)}`);
+            console.log(`🎲 Using calculated odds for ${match.id}: ${odds1.toFixed(1)} / ${odds2.toFixed(1)}`);
           } else {
             console.log(`🎲 Using database odds for ${match.id}: ${odds1} / ${odds2}`);
           }
@@ -220,8 +220,8 @@ const FrontPage = () => {
           const enrichedMatch = {
             ...match,
             total_pool: totalPool || match.total_pool || 0,
-            odds_wrestler1: parseFloat(odds1.toFixed(2)),
-            odds_wrestler2: parseFloat(odds2.toFixed(2)),
+            odds_wrestler1: parseFloat(odds1.toFixed(1)),
+            odds_wrestler2: parseFloat(odds2.toFixed(1)),
             enriched: true,
             bets_count: bets?.length || 0
           };
@@ -679,7 +679,7 @@ const FrontPage = () => {
       console.log(`⚠️ Odds were above 50.0, capped to: ${odds}`);
     }
 
-    const oddsString = odds.toFixed(2);
+    const oddsString = odds.toFixed(1);
     console.log(`✅ Dynamic odds for ${wrestler} in ${matchId}: ${oddsString} (pool: ${wrestler === 'wrestler1' ? wrestler1Pool : wrestler2Pool} WC)`);
     return oddsString;
   };

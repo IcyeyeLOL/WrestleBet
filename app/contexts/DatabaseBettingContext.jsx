@@ -53,8 +53,8 @@ export const BettingProvider = ({ children }) => {
       Math.min(50.00, Math.max(1.10, (totalPoolWC / pools.wrestler2))) : 50.00;
 
     return {
-      wrestler1: wrestler1Odds.toFixed(2),
-      wrestler2: wrestler2Odds.toFixed(2)
+      wrestler1: wrestler1Odds.toFixed(1),
+      wrestler2: wrestler2Odds.toFixed(1)
     };
   }, [bettingPools]);
 
