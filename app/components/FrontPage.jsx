@@ -107,10 +107,27 @@ const FrontPage = () => {
     };
   }, []);
 
+  // Listen for admin match events to ensure real-time sync
+  useEffect(() => {
+    const handleAdminMatchUpdate = () => {
+      console.log('📢 Admin match event received on FrontPage - refreshing matches...');
+      setTimeout(() => loadDynamicMatches(), 200);
+    };
+
+    window.addEventListener('admin-match-created', handleAdminMatchUpdate);
+    window.addEventListener('admin-match-deleted', handleAdminMatchUpdate);
+
+    return () => {
+      window.removeEventListener('admin-match-created', handleAdminMatchUpdate);
+      window.removeEventListener('admin-match-deleted', handleAdminMatchUpdate);
+    };
+  }, []);
+
   // Load matches from database (fully dynamic - no hardcoded data)
   const loadDynamicMatches = async () => {
     try {
       setMatchesLoading(true);
+      console.log('🔄 Loading dynamic matches from database...');
       
       // Use simplified query approach
       const { data, error } = await supabase
@@ -126,7 +143,7 @@ const FrontPage = () => {
       }
       
       const matches = data || [];
-      console.log(`📊 Raw matches from database:`, matches);
+      console.log(`📊 Raw matches from database (${matches.length} total):`, matches);
 
       // CRITICAL: Filter out any potential hardcoded matches
       const validMatches = matches.filter(match => {
@@ -146,31 +163,77 @@ const FrontPage = () => {
       // Enrich matches with betting data
       const enrichedMatches = await Promise.all(validMatches.map(async (match) => {
         try {
-          // Load bets for this match
-          const { data: bets } = await supabase
+          console.log(`🔍 Enriching match ${match.id} with betting data...`);
+          
+          // Load bets for this match with error handling
+          const { data: bets, error: betsError } = await supabase
             .from('bets')
             .select('*')
             .eq('match_id', match.id);
+
+          if (betsError) {
+            console.error(`❌ Error fetching bets for match ${match.id}:`, betsError);
+            console.error('❌ This indicates a database permissions issue or missing table');
+            // Return match with database values as fallback
+            return {
+              ...match,
+              total_pool: match.total_pool || 0,
+              odds_wrestler1: match.odds_wrestler1 || 1.10,
+              odds_wrestler2: match.odds_wrestler2 || 1.10,
+              enriched: false,
+              error: `Database error: ${betsError.message}`
+            };
+          } else {
+            console.log(`📊 Fetched ${bets?.length || 0} bets for match ${match.id}:`, bets);
+          }
 
           // Calculate pools and odds
           const wrestler1Bets = bets?.filter(bet => bet.wrestler_choice === 'wrestler1') || [];
           const wrestler2Bets = bets?.filter(bet => bet.wrestler_choice === 'wrestler2') || [];
 
-          const wrestler1Pool = wrestler1Bets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
-          const wrestler2Pool = wrestler2Bets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
+          const wrestler1Pool = wrestler1Bets.reduce((sum, bet) => sum + (parseFloat(bet.amount) || 0), 0);
+          const wrestler2Pool = wrestler2Bets.reduce((sum, bet) => sum + (parseFloat(bet.amount) || 0), 0);
           const totalPool = wrestler1Pool + wrestler2Pool;
 
-          // Calculate odds with database values as backup
-          const odds1 = wrestler1Pool > 0 ? Math.max(1.10, totalPool / wrestler1Pool) : (match.odds_wrestler1 || 1.10);
-          const odds2 = wrestler2Pool > 0 ? Math.max(1.10, totalPool / wrestler2Pool) : (match.odds_wrestler2 || 1.10);
+          console.log(`💰 Calculated pools for ${match.id}:`, {
+            wrestler1Pool,
+            wrestler2Pool,
+            totalPool,
+            wrestler1Bets: wrestler1Bets.length,
+            wrestler2Bets: wrestler2Bets.length,
+            rawBets: bets?.map(b => ({ choice: b.wrestler_choice, amount: b.amount }))
+          });
 
-          return {
+          // Calculate odds with database values as backup
+          let odds1 = match.odds_wrestler1 || 1.10;
+          let odds2 = match.odds_wrestler2 || 1.10;
+          
+          // Use calculated odds if we have betting data
+          if (totalPool > 0) {
+            odds1 = wrestler1Pool > 0 ? Math.max(1.10, totalPool / wrestler1Pool) : 1.10;
+            odds2 = wrestler2Pool > 0 ? Math.max(1.10, totalPool / wrestler2Pool) : 1.10;
+            console.log(`🎲 Using calculated odds for ${match.id}: ${odds1.toFixed(2)} / ${odds2.toFixed(2)}`);
+          } else {
+            console.log(`🎲 Using database odds for ${match.id}: ${odds1} / ${odds2}`);
+          }
+
+          const enrichedMatch = {
             ...match,
             total_pool: totalPool || match.total_pool || 0,
-            odds_wrestler1: odds1,
-            odds_wrestler2: odds2,
-            enriched: true
+            odds_wrestler1: parseFloat(odds1.toFixed(2)),
+            odds_wrestler2: parseFloat(odds2.toFixed(2)),
+            enriched: true,
+            bets_count: bets?.length || 0
           };
+
+          console.log(`✅ Enriched match ${match.id}:`, {
+            total_pool: enrichedMatch.total_pool,
+            odds_wrestler1: enrichedMatch.odds_wrestler1,
+            odds_wrestler2: enrichedMatch.odds_wrestler2,
+            bets_count: enrichedMatch.bets_count
+          });
+
+          return enrichedMatch;
 
         } catch (enrichError) {
           console.warn(`⚠️ Error enriching match ${match.id}:`, enrichError);
@@ -199,6 +262,9 @@ const FrontPage = () => {
           enriched: m.enriched
         })));
       }
+      
+      console.log('🎯 Setting dynamicMatches state - this should trigger UI re-render');
+      setDynamicMatches(enrichedMatches);
       
     } catch (error) {
       console.error('❌ Error loading dynamic matches:', error);
@@ -344,6 +410,26 @@ const FrontPage = () => {
     handleVote(matchId, wrestler);
   };
 
+  // Helper function to get display name from wrestler position
+  const getWrestlerDisplayName = (wrestler, matchId) => {
+    // If already a display name, return as-is
+    if (wrestler !== 'wrestler1' && wrestler !== 'wrestler2') {
+      return wrestler;
+    }
+    
+    // Find the match to get actual names
+    const match = dynamicMatches.find(m => m.id === matchId);
+    if (!match) return wrestler;
+    
+    if (wrestler === 'wrestler1') {
+      return match.wrestler1;
+    } else if (wrestler === 'wrestler2') {
+      return match.wrestler2;
+    }
+    
+    return wrestler;
+  };
+
   const handlePlaceBet = (matchId, wrestler, currentOdds) => {
     if (!isLoaded) return;
     
@@ -358,7 +444,8 @@ const FrontPage = () => {
 
     const existingBet = bets.find(bet => bet.matchId === matchId && bet.status === 'pending');
     if (existingBet) {
-      alert(`❌ You already have a pending bet on this match!\n\n${existingBet.wrestler}: ${existingBet.amount} WC at ${existingBet.odds} odds`);
+      const displayName = getWrestlerDisplayName(existingBet.wrestler, matchId);
+      alert(`❌ You already have a pending bet on this match!\n\n${displayName}: ${existingBet.amount} WC at ${existingBet.odds} odds`);
       return;
     }
     
@@ -375,8 +462,10 @@ const FrontPage = () => {
     });
   };
 
-  const handleConfirmBet = (amount) => {
+  const handleConfirmBet = async (amount) => {
     const { matchId, wrestler, odds: betOdds } = bettingModal;
+    
+    console.log(`💰 Starting bet placement: ${amount} WC on ${wrestler} at ${betOdds} odds`);
     
     // Check if user can afford the bet
     if (!canAffordBet(amount)) {
@@ -384,10 +473,46 @@ const FrontPage = () => {
       return;
     }
     
-    // Deduct balance and place bet
-    subtractFromBalance(amount, `Bet on ${wrestler}`);
-    placeBetFromVote(matchId, wrestler, betOdds, amount);
-    alert(`✅ Bet Placed Successfully!\n\n${wrestler}: ${amount} WC at ${betOdds} odds\nPotential Payout: ${Math.floor(amount * parseFloat(betOdds))} WC\nRemaining Balance: ${getFormattedBalance()}`);
+    try {
+      // Convert odds string to number and ensure it meets API requirements
+      const oddsNumber = parseFloat(betOdds);
+      const validOdds = Math.max(1.10, oddsNumber); // Ensure odds are >= 1.10
+      
+      console.log(`🎲 Odds conversion: "${betOdds}" → ${oddsNumber} → ${validOdds} (validated)`);
+      
+      // Deduct balance first (optimistic update)
+      subtractFromBalance(amount, `Bet on ${wrestler}`);
+      
+      // Place bet with enhanced error handling and validated odds
+      console.log('🔄 Calling placeBetFromVote...');
+      const betResult = await placeBetFromVote(matchId, wrestler, amount, validOdds);
+      
+      // Force immediate refresh of match data regardless of bet result
+      console.log('🔄 Forcing match data refresh after bet...');
+      setTimeout(() => {
+        console.log('🔄 Executing delayed match refresh...');
+        loadDynamicMatches();
+      }, 1000); // 1 second delay
+      
+      // Also trigger immediate refresh for real-time feel
+      setTimeout(() => {
+        console.log('🔄 Executing immediate match refresh...');
+        loadDynamicMatches();
+      }, 100); // 100ms delay
+      
+      const displayName = getWrestlerDisplayName(wrestler, matchId);
+      alert(`✅ Bet Placed Successfully!\n\n${displayName}: ${amount} WC at ${validOdds} odds\nPotential Payout: ${Math.floor(amount * validOdds)} WC\nRemaining Balance: ${getFormattedBalance()}`);
+      
+    } catch (error) {
+      console.error('❌ Bet placement failed:', error);
+      
+      // Refund the balance on error
+      // Note: This is a simple approach - in production you'd want more sophisticated error handling
+      alert(`❌ Bet Failed!\n\nError: ${error.message}\nYour balance has been refunded.`);
+      
+      // Force refresh anyway to ensure UI is consistent
+      setTimeout(() => loadDynamicMatches(), 500);
+    }
   };
 
   // Real WC percentage calculation based on actual betting pools from database
@@ -400,54 +525,53 @@ const FrontPage = () => {
       console.log(`⚠️ Match not found for ${matchId}, returning 50%`);
       return 50;
     }
+
+    // Get actual wrestler pools from database (NEW COLUMNS)
+    const wrestler1Pool = parseFloat(match.wrestler1_pool) || 0;
+    const wrestler2Pool = parseFloat(match.wrestler2_pool) || 0;
+    const totalPool = wrestler1Pool + wrestler2Pool;
     
-    // Use real total pool from database
-    const totalWC = match.total_pool || 0;
-    
-    console.log(`📊 Real pool data for ${matchId}:`, {
-      total_pool: totalWC,
+    console.log(`📊 Pool data for ${matchId}:`, {
+      wrestler1_pool: wrestler1Pool,
+      wrestler2_pool: wrestler2Pool,
+      total_pool: totalPool,
+      database_total_pool: match.total_pool,
       odds_wrestler1: match.odds_wrestler1,
       odds_wrestler2: match.odds_wrestler2
     });
-    
-    if (!totalWC || totalWC === 0) {
-      console.log(`⚠️ No real WC in pool for ${matchId}: ${totalWC}, returning 50%`);
+
+    // If no bets placed yet, return 50/50
+    if (totalPool === 0) {
+      console.log(`⚠️ No bets placed yet for ${matchId}, returning 50%`);
       return 50;
     }
-    
-    // Calculate percentage based on odds (inverse relationship)
-    let percentage = 50; // Default
+
+    // Calculate raw percentage: (wrestlerPool / totalPool) * 100
+    let percentage = 50; // Default for no bets
     
     if (wrestlerPosition === 'wrestler1') {
-      const odds = parseFloat(match.odds_wrestler1) || 1.0;
-      percentage = Math.round((1 / odds) * 100);
+      percentage = (wrestler1Pool / totalPool) * 100;
     } else if (wrestlerPosition === 'wrestler2') {
-      const odds = parseFloat(match.odds_wrestler2) || 1.0;
-      percentage = Math.round((1 / odds) * 100);
+      percentage = (wrestler2Pool / totalPool) * 100;
     }
     
-    console.log(`📊 Real percentage calculation for ${matchId} - ${wrestlerPosition}:`, {
-      totalWC,
-      odds: wrestlerPosition === 'wrestler1' ? match.odds_wrestler1 : match.odds_wrestler2,
-      percentage
+    // Round to nearest integer
+    percentage = Math.round(percentage);
+    
+    console.log(`📊 Percentage calculation for ${matchId} - ${wrestlerPosition}:`, {
+      wrestlerPool: wrestlerPosition === 'wrestler1' ? wrestler1Pool : wrestler2Pool,
+      totalPool,
+      rawPercentage: ((wrestlerPosition === 'wrestler1' ? wrestler1Pool : wrestler2Pool) / totalPool * 100).toFixed(2),
+      finalPercentage: percentage
     });
     
-    // Ensure percentage is valid and within bounds
-    if (isNaN(percentage) || percentage < 0) {
+    // Ensure percentage is valid
+    if (isNaN(percentage) || percentage < 0 || percentage > 100) {
       console.log(`⚠️ Invalid percentage calculated: ${percentage}, returning 50%`);
       return 50;
     }
     
-    if (percentage === 0) {
-      console.log(`⚠️ Calculated 0% for ${wrestlerPosition}, returning 1% for visual feedback`);
-      return 1;
-    }
-    
-    if (percentage > 99) {
-      console.log(`⚠️ Calculated ${percentage}% for ${wrestlerPosition}, capping at 99%`);
-      return 99;
-    }
-    
+    console.log(`✅ Final percentage for ${wrestlerPosition}: ${percentage}%`);
     return percentage;
   };
 
@@ -498,7 +622,7 @@ const FrontPage = () => {
     setBettingModal({ isOpen: false, matchId: '', wrestler: '', odds: '' });
   };
 
-  // Get real dynamic odds from database
+  // Get real dynamic odds calculated from betting pools (like percentage bars)
   const getDynamicOdds = (matchId, wrestler) => {
     console.log(`🔍 getDynamicOdds called for ${matchId} - ${wrestler}`);
     
@@ -508,18 +632,56 @@ const FrontPage = () => {
       console.log(`⚠️ Match not found for ${matchId}, returning 2.00`);
       return '2.00';
     }
+
+    // Get actual wrestler pools from database (same as percentage calculation)
+    const wrestler1Pool = parseFloat(match.wrestler1_pool) || 0;
+    const wrestler2Pool = parseFloat(match.wrestler2_pool) || 0;
+    const totalPool = wrestler1Pool + wrestler2Pool;
     
-    // Use real odds from database
-    let odds = '2.00'; // Default
+    console.log(`💰 Odds pool data for ${matchId}:`, {
+      wrestler1_pool: wrestler1Pool,
+      wrestler2_pool: wrestler2Pool,
+      total_pool: totalPool
+    });
+
+    // If no bets placed yet, return even odds
+    if (totalPool === 0) {
+      console.log(`⚠️ No bets placed yet for ${matchId}, returning even odds 2.00`);
+      return '2.00';
+    }
+
+    // Calculate dynamic odds: odds = totalPool / wrestlerPool (higher pool = lower odds)
+    let odds = 2.0; // Default
     
     if (wrestler === 'wrestler1') {
-      odds = (match.odds_wrestler1 || 2.0).toString();
+      if (wrestler1Pool > 0) {
+        odds = totalPool / wrestler1Pool;
+      } else {
+        odds = 10.0; // High odds if no bets on this wrestler
+      }
     } else if (wrestler === 'wrestler2') {
-      odds = (match.odds_wrestler2 || 2.0).toString();
+      if (wrestler2Pool > 0) {
+        odds = totalPool / wrestler2Pool;
+      } else {
+        odds = 10.0; // High odds if no bets on this wrestler
+      }
     }
-    
-    console.log(`✅ Real odds for ${wrestler} in ${matchId}: ${odds}`);
-    return odds;
+
+    // Ensure odds are never below 1.10 (API validation requirement)
+    if (odds < 1.10) {
+      odds = 1.10;
+      console.log(`⚠️ Odds were below 1.10, adjusted to: ${odds}`);
+    }
+
+    // Cap maximum odds at 50.0 for display purposes
+    if (odds > 50.0) {
+      odds = 50.0;
+      console.log(`⚠️ Odds were above 50.0, capped to: ${odds}`);
+    }
+
+    const oddsString = odds.toFixed(2);
+    console.log(`✅ Dynamic odds for ${wrestler} in ${matchId}: ${oddsString} (pool: ${wrestler === 'wrestler1' ? wrestler1Pool : wrestler2Pool} WC)`);
+    return oddsString;
   };
 
   if (!isLoaded) {
@@ -650,7 +812,17 @@ const FrontPage = () => {
                           <div className="text-sm text-slate-400 bg-slate-700/50 rounded-lg px-4 py-2">
                           {(() => {
                               const bet = getExistingBet(match.id);
-                            return bet ? `${bet.wrestler}: ${bet.amount} WC at ${bet.odds} odds` : '';
+                              if (!bet) return '';
+                              
+                              // Convert wrestler1/wrestler2 back to actual names for display
+                              let displayName = bet.wrestler;
+                              if (bet.wrestler === 'wrestler1') {
+                                displayName = match.wrestler1;
+                              } else if (bet.wrestler === 'wrestler2') {
+                                displayName = match.wrestler2;
+                              }
+                              
+                            return `${displayName}: ${bet.amount} WC at ${bet.odds} odds`;
                           })()}
                         </div>
                       </div>

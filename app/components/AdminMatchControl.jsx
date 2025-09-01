@@ -307,8 +307,13 @@ const AdminMatchControl = () => {
     }
   };
 
-  const handleDeleteMatch = async (matchId) => {
-    if (!window.confirm('🗑️ Delete this match?\n\n⚠️ This will remove the match and all associated bets. This action cannot be undone!')) return;
+  const handleDeleteMatch = async (matchId, force = false) => {
+    const match = matches.find(m => m.id === matchId);
+    const matchName = match ? `${match.wrestler1 || match.wrestler_1} vs ${match.wrestler2 || match.wrestler_2}` : 'this match';
+    
+    if (!force) {
+      if (!window.confirm(`🗑️ Delete ${matchName}?\n\n⚠️ This will remove the match and all associated bets. This action cannot be undone!`)) return;
+    }
 
     try {
       // Check if this is a demo match (created locally)
@@ -326,12 +331,17 @@ const AdminMatchControl = () => {
         } catch {}
         
         await loadMatches();
-        alert('✅ Match deleted successfully!');
+        alert(`✅ Match deleted successfully${force ? ' (including all bets)' : ''}!`);
         return;
       }
 
       // Try API deletion for real matches
-      const params = new URLSearchParams({ id: String(matchId), adminUserId: 'admin-user-id' });
+      const params = new URLSearchParams({ 
+        id: String(matchId), 
+        adminUserId: 'admin-user-id',
+        ...(force && { force: 'true' })
+      });
+      
       const result = await safeFetch(`/api/admin/matches?${params.toString()}`, {
         method: 'DELETE'
       });
@@ -353,7 +363,15 @@ const AdminMatchControl = () => {
         } catch {}
 
         await loadMatches();
-        alert('✅ Match deleted successfully!');
+        alert(`✅ Match deleted successfully${force ? ' (including all bets)' : ''}!`);
+      } else if (data.requiresForce) {
+        // Show detailed error with force delete option
+        const confirmMessage = `${data.error}\n\nMatch: ${matchName}\nBets: ${data.betDetails.count}\nTotal WC: ${data.betDetails.totalAmount}\n\nWould you like to FORCE DELETE this match and ALL its bets? This cannot be undone!`;
+        
+        if (window.confirm(confirmMessage)) {
+          // Recursive call with force = true
+          await handleDeleteMatch(matchId, true);
+        }
       } else {
         // If API fails, try local deletion as fallback
         console.warn('API deletion failed, trying local deletion:', data.error);
@@ -371,12 +389,12 @@ const AdminMatchControl = () => {
           await loadMatches();
           alert('✅ Match deleted locally (API unavailable)!');
         } catch (localError) {
-        alert(`❌ Error: ${data.error}`);
+          alert(`❌ Error: ${data.error}`);
         }
       }
     } catch (error) {
       console.error('Error deleting match:', error);
-      alert('❌ Failed to delete match');
+      alert(`❌ Failed to delete match: ${error.message}`);
     }
   };
 

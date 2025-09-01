@@ -203,6 +203,7 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const adminUserId = searchParams.get('adminUserId');
+    const force = searchParams.get('force') === 'true';
 
     if (!supabaseConfigured) {
       return NextResponse.json({ success: false, error: 'Backend not configured (Supabase). Configure env to delete matches.' }, { status: 503 });
@@ -215,7 +216,7 @@ export async function DELETE(request) {
       }, { status: 400 });
     }
 
-    console.log(`🗑️ Admin attempting to delete match ${id}`);
+    console.log(`🗑️ Admin attempting to delete match ${id}${force ? ' (FORCE DELETE)' : ''}`);
 
     // Use regular supabase client (RLS policies should be permissive enough)
     const dbClient = supabase;
@@ -234,21 +235,48 @@ export async function DELETE(request) {
 
     console.log(`📊 Match details: ${matchToDelete.wrestler1} vs ${matchToDelete.wrestler2}`);
 
-    // Check if match has bets (prevent deletion if bets exist)
+    // Check if match has bets (prevent deletion if bets exist, unless force = true)
     const { data: bets, error: betsError } = await dbClient
       .from('bets')
-      .select('id')
+      .select('id, amount, wrestler_choice')
       .eq('match_id', id);
 
     if (betsError) {
       console.error('Error checking bets:', betsError);
       // Continue with deletion even if we can't check bets
-    } else if (bets && bets.length > 0) {
-      console.log(`⚠️ Match has ${bets.length} bets, preventing deletion`);
+    } else if (bets && bets.length > 0 && !force) {
+      console.log(`⚠️ Match has ${bets.length} bets, preventing deletion (use force=true to override)`);
+      const totalBetAmount = bets.reduce((sum, bet) => sum + bet.amount, 0);
       return NextResponse.json({ 
         success: false, 
-        error: `Cannot delete match with existing bets (${bets.length} bets found)` 
+        error: `Cannot delete match with existing bets (${bets.length} bets found, ${totalBetAmount} WC total). Use force delete to override.`,
+        requiresForce: true,
+        betDetails: {
+          count: bets.length,
+          totalAmount: totalBetAmount
+        }
       }, { status: 400 });
+    }
+
+    // If force delete is enabled, delete all related data first
+    if (force && bets && bets.length > 0) {
+      console.log(`💥 Force deleting ${bets.length} bets for match ${id}`);
+      
+      // Delete all bets for this match
+      const { error: betsDeleteError } = await dbClient
+        .from('bets')
+        .delete()
+        .eq('match_id', id);
+
+      if (betsDeleteError) {
+        console.error('Error force deleting bets:', betsDeleteError);
+        return NextResponse.json({ 
+          success: false, 
+          error: `Failed to delete related bets: ${betsDeleteError.message}` 
+        }, { status: 500 });
+      } else {
+        console.log('✅ Force deleted all related bets');
+      }
     }
 
     // Delete related votes first to avoid foreign key constraints

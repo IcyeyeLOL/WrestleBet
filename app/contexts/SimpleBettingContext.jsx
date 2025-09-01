@@ -380,10 +380,20 @@ export const BettingProvider = ({ children }) => {
     try {
       console.log(`💰 Placing global bet: ${betAmount} WC on ${wrestler} in ${matchId}`);
       
+      // Get match data for better bet display
+      const matchData = pollData[matchId];
+      const displayWrestler = wrestler === 'wrestler1' ? matchData?.wrestler1 || 'Wrestler 1' : 
+                             wrestler === 'wrestler2' ? matchData?.wrestler2 || 'Wrestler 2' : 
+                             wrestler;
+      const matchDisplay = matchData ? `${matchData.wrestler1} vs ${matchData.wrestler2}` : 'Unknown Match';
+      
       const newBet = {
         id: Date.now().toString(),
         matchId,
-        wrestler,
+        wrestler, // Keep backend format for API calls
+        displayWrestler, // User-friendly name for display
+        match: matchDisplay, // User-friendly match name
+        event: 'Wrestling Championship', // Event name
         amount: betAmount,
         odds,
         status: 'pending',
@@ -394,6 +404,14 @@ export const BettingProvider = ({ children }) => {
       setBets(prevBets => {
         const updatedBets = [...prevBets, newBet];
         updateBettingStats(updatedBets);
+        
+        // Sync to localStorage for cross-tab sync
+        try {
+          localStorage.setItem('wrestlebet_bets', JSON.stringify(updatedBets));
+        } catch (error) {
+          console.error('Failed to sync bets to localStorage:', error);
+        }
+        
         return updatedBets;
       });
       
@@ -407,29 +425,55 @@ export const BettingProvider = ({ children }) => {
         // Use position-based keys for consistent tracking
         let wrestlerPosition = 'wrestler1';
         
-        // Get match data to determine which wrestler is which
-        const matchData = pollData[matchId];
-        if (matchData) {
-          const wrestler1Name = matchData.wrestler1?.toLowerCase().trim();
-          const wrestler2Name = matchData.wrestler2?.toLowerCase().trim();
-          const betWrestler = wrestler.toLowerCase().trim();
-          
-          if (betWrestler === wrestler1Name) {
-            wrestlerPosition = 'wrestler1';
-          } else if (betWrestler === wrestler2Name) {
-            wrestlerPosition = 'wrestler2';
-          } else {
-            // Fallback: use hash-based assignment for consistency
-            const hash = betWrestler.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-            wrestlerPosition = hash % 2 === 0 ? 'wrestler1' : 'wrestler2';
-            console.log(`⚠️ Wrestler name mismatch, using hash assignment: ${betWrestler} -> ${wrestlerPosition}`);
-          }
+        console.log(`🔍 LOCAL POOL UPDATE DEBUG:`, {
+          wrestler: wrestler,
+          isDirectPosition: wrestler === 'wrestler1' || wrestler === 'wrestler2'
+        });
+        
+        // If wrestler is already 'wrestler1' or 'wrestler2', use it directly
+        if (wrestler === 'wrestler1' || wrestler === 'wrestler2') {
+          wrestlerPosition = wrestler;
+          console.log(`✅ LOCAL: Direct position match: ${wrestler}`);
         } else {
-          // No match data, use hash-based assignment
-          const betWrestler = wrestler.toLowerCase().trim();
-          const hash = betWrestler.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-          wrestlerPosition = hash % 2 === 0 ? 'wrestler1' : 'wrestler2';
-          console.log(`⚠️ No match data, using hash assignment: ${betWrestler} -> ${wrestlerPosition}`);
+          // Fallback to name matching for backwards compatibility
+          const matchData = pollData[matchId];
+          
+          if (matchData) {
+            const wrestler1Name = matchData.wrestler1?.toLowerCase().trim();
+            const wrestler2Name = matchData.wrestler2?.toLowerCase().trim();
+            const betWrestler = wrestler.toLowerCase().trim();
+            
+            console.log(`🔍 LOCAL NAME MATCHING:`, {
+              wrestler1Name,
+              wrestler2Name,
+              betWrestler,
+              match1: betWrestler === wrestler1Name,
+              match2: betWrestler === wrestler2Name
+            });
+            
+            if (betWrestler === wrestler1Name) {
+              wrestlerPosition = 'wrestler1';
+              console.log(`✅ LOCAL: Matched wrestler1: ${betWrestler} = ${wrestler1Name}`);
+            } else if (betWrestler === wrestler2Name) {
+              wrestlerPosition = 'wrestler2';
+              console.log(`✅ LOCAL: Matched wrestler2: ${betWrestler} = ${wrestler2Name}`);
+            } else {
+              // Try partial matching for common cases
+              if (wrestler1Name && wrestler1Name.includes(betWrestler)) {
+                wrestlerPosition = 'wrestler1';
+                console.log(`✅ LOCAL: Partial match wrestler1: ${betWrestler} in ${wrestler1Name}`);
+              } else if (wrestler2Name && wrestler2Name.includes(betWrestler)) {
+                wrestlerPosition = 'wrestler2';
+                console.log(`✅ LOCAL: Partial match wrestler2: ${betWrestler} in ${wrestler2Name}`);
+              } else {
+                wrestlerPosition = 'wrestler1';
+                console.log(`⚠️ LOCAL: Defaulting to wrestler1 for: ${wrestler}`);
+              }
+            }
+          } else {
+            wrestlerPosition = 'wrestler1';
+            console.log(`⚠️ LOCAL: No match data, defaulting to wrestler1 for: ${wrestler}`);
+          }
         }
         
         // Ensure we're adding a valid number
@@ -518,13 +562,71 @@ export const BettingProvider = ({ children }) => {
       
       // Sync bet with global database
       try {
-        const matchData = pollData[matchId];
+        // For dynamic matches, matchId is already the database match ID
+        const actualMatchId = matchId;
+        
+        // Determine wrestler position for API (wrestler1 or wrestler2)
+        let wrestlerPosition = 'wrestler1';
+        
+        console.log(`🔍 WRESTLER POSITION DEBUG:`, {
+          wrestler: wrestler,
+          isDirectPosition: wrestler === 'wrestler1' || wrestler === 'wrestler2'
+        });
+        
+        // If wrestler is already 'wrestler1' or 'wrestler2', use it directly
+        if (wrestler === 'wrestler1' || wrestler === 'wrestler2') {
+          wrestlerPosition = wrestler;
+          console.log(`✅ Direct position match: ${wrestler}`);
+        } else {
+          // Fallback to name matching for backwards compatibility
+          const matchData = pollData[matchId];
+          
+          if (matchData) {
+            const wrestler1Name = matchData.wrestler1?.toLowerCase().trim();
+            const wrestler2Name = matchData.wrestler2?.toLowerCase().trim();
+            const betWrestler = wrestler.toLowerCase().trim();
+            
+            console.log(`🔍 NAME MATCHING:`, {
+              wrestler1Name,
+              wrestler2Name,
+              betWrestler,
+              match1: betWrestler === wrestler1Name,
+              match2: betWrestler === wrestler2Name
+            });
+            
+            if (betWrestler === wrestler1Name) {
+              wrestlerPosition = 'wrestler1';
+              console.log(`✅ Matched wrestler1: ${betWrestler} = ${wrestler1Name}`);
+            } else if (betWrestler === wrestler2Name) {
+              wrestlerPosition = 'wrestler2';
+              console.log(`✅ Matched wrestler2: ${betWrestler} = ${wrestler2Name}`);
+            } else {
+              // Try partial matching for common cases
+              if (wrestler1Name && wrestler1Name.includes(betWrestler)) {
+                wrestlerPosition = 'wrestler1';
+                console.log(`✅ Partial match wrestler1: ${betWrestler} in ${wrestler1Name}`);
+              } else if (wrestler2Name && wrestler2Name.includes(betWrestler)) {
+                wrestlerPosition = 'wrestler2';
+                console.log(`✅ Partial match wrestler2: ${betWrestler} in ${wrestler2Name}`);
+              } else {
+                wrestlerPosition = 'wrestler1';
+                console.log(`⚠️ Defaulting to wrestler1 for: ${wrestler}`);
+              }
+            }
+          } else {
+            wrestlerPosition = 'wrestler1';
+            console.log(`⚠️ No match data, defaulting to wrestler1 for: ${wrestler}`);
+          }
+        }
+        
+        console.log(`🔄 Syncing bet to database: ${actualMatchId}, ${wrestlerPosition}, ${betAmount} WC`);
+        
         const result = await safeFetch('/api/bets', {
           method: 'POST',
           body: JSON.stringify({
             userId: 'anonymous-user', // In production, get from auth
-            matchId: matchData?.matchId,
-            wrestlerChoice: wrestler,
+            matchId: actualMatchId, // Use the actual database match ID
+            wrestlerChoice: wrestlerPosition, // Use wrestler1/wrestler2 position
             betAmount: betAmount,
             odds: odds
           }),
@@ -533,6 +635,8 @@ export const BettingProvider = ({ children }) => {
         if (result.success) {
           const data = result.data;
           console.log('✅ Bet synced to global database:', data);
+          console.log('📊 New odds from database:', data.newOdds);
+          console.log('💰 New totals from database:', data.wrestlerTotals);
         } else {
           console.log('⚠️ Database bet sync failed, maintaining local state');
           // Keep local changes but also backup to localStorage
@@ -571,19 +675,28 @@ export const BettingProvider = ({ children }) => {
     setBets(prevBets => {
       const updatedBets = prevBets.map(bet => {
         if (bet.matchId === matchId && bet.status === 'pending') {
-          const isWinner = bet.wrestler === winner;
-          return {
+          const isWinner = bet.wrestler === winner || bet.displayWrestler === winner;
+          const updatedBet = {
             ...bet,
             status: isWinner ? 'won' : 'lost',
             winnings: isWinner ? (bet.amount * bet.odds) : 0,
             completedAt: new Date().toISOString()
           };
+          return updatedBet;
         }
         return bet;
       });
       
       // Update stats with new bet results
       updateBettingStats(updatedBets);
+      
+      // Sync to localStorage for cross-tab sync
+      try {
+        localStorage.setItem('wrestlebet_bets', JSON.stringify(updatedBets));
+      } catch (error) {
+        console.error('Failed to sync bet results to localStorage:', error);
+      }
+      
       return updatedBets;
     });
     
@@ -893,15 +1006,75 @@ export const BettingProvider = ({ children }) => {
     };
   }, []);
 
-  // Clean up any existing demo data on component mount
+  // Update bet display names when match data changes
   useEffect(() => {
-    // Remove any existing demo data from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('admin_demo_matches');
-      localStorage.removeItem('wrestlebet_betting_pools');
-      localStorage.removeItem('wrestlebet_bets');
-      console.log('🧹 Cleaned up demo data from localStorage');
+    if (Object.keys(pollData).length > 0 && bets.length > 0) {
+      setBets(prevBets => {
+        const updatedBets = prevBets.map(bet => {
+          const matchData = Object.values(pollData).find(match => match.matchId === bet.matchId);
+          if (matchData) {
+            const displayWrestler = bet.wrestler === 'wrestler1' ? matchData.wrestler1 || 'Wrestler 1' : 
+                                   bet.wrestler === 'wrestler2' ? matchData.wrestler2 || 'Wrestler 2' : 
+                                   bet.wrestler;
+            const matchDisplay = `${matchData.wrestler1} vs ${matchData.wrestler2}`;
+            
+            return {
+              ...bet,
+              displayWrestler,
+              match: matchDisplay
+            };
+          }
+          return bet;
+        });
+        
+        // Sync updated bets to localStorage
+        try {
+          localStorage.setItem('wrestlebet_bets', JSON.stringify(updatedBets));
+        } catch (error) {
+          console.error('Failed to sync updated bets to localStorage:', error);
+        }
+        
+        return updatedBets;
+      });
     }
+  }, [pollData]);
+
+  // Cross-tab sync and localStorage integration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Load existing bets from localStorage on mount
+    try {
+      const storedBets = localStorage.getItem('wrestlebet_bets');
+      if (storedBets) {
+        const parsedBets = JSON.parse(storedBets);
+        setBets(parsedBets);
+        updateBettingStats(parsedBets);
+        console.log('✅ Loaded existing bets from localStorage:', parsedBets);
+      }
+    } catch (error) {
+      console.error('Failed to load bets from localStorage:', error);
+    }
+
+    // Listen for storage changes from other tabs
+    const handleStorageChange = (event) => {
+      if (event.key === 'wrestlebet_bets' && event.newValue) {
+        try {
+          const newBets = JSON.parse(event.newValue);
+          setBets(newBets);
+          updateBettingStats(newBets);
+          console.log('🔄 Synced bets from another tab:', newBets);
+        } catch (error) {
+          console.error('Failed to sync bets from another tab:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Load global poll data from database
@@ -922,7 +1095,13 @@ export const BettingProvider = ({ children }) => {
     getBalanceStatus,        // ADD THIS
     declareMatchWinner,      // ADD THIS
     resetAllPools,          // ADD THIS
-    completedMatches: {}     // ADD THIS
+    completedMatches: {},     // ADD THIS
+    // Helper function for UI components to get display-ready bet data
+    getBetsForDisplay: () => bets.map(bet => ({
+      ...bet,
+      wrestler: bet.displayWrestler || bet.wrestler, // Use display name for UI
+      match: bet.match || 'Unknown Match'
+    }))
   };
 
   return (

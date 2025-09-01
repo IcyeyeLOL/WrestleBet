@@ -142,13 +142,18 @@ const CompleteDynamicAdminPanel = () => {
   };
 
   // Delete match
-  const deleteMatch = async (matchId) => {
-    if (!confirm('Are you sure you want to delete this match? This cannot be undone.')) {
-      return;
+  const deleteMatch = async (matchId, force = false) => {
+    const match = matches.find(m => m.id === matchId);
+    const matchName = match ? `${match.wrestler1} vs ${match.wrestler2}` : 'this match';
+    
+    if (!force) {
+      if (!confirm(`Are you sure you want to delete ${matchName}? This cannot be undone.`)) {
+        return;
+      }
     }
 
     try {
-      const response = await fetch(`/api/admin/matches?id=${matchId}&adminUserId=${user?.id}`, {
+      const response = await fetch(`/api/admin/matches?id=${matchId}&adminUserId=${user?.id}${force ? '&force=true' : ''}`, {
         method: 'DELETE'
       });
 
@@ -156,7 +161,15 @@ const CompleteDynamicAdminPanel = () => {
 
       if (result.success) {
         await loadAllData();
-        alert('Match deleted successfully');
+        alert(`Match deleted successfully${force ? ' (including all bets)' : ''}`);
+      } else if (result.requiresForce) {
+        // Show detailed error with force delete option
+        const confirmMessage = `${result.error}\n\nMatch: ${matchName}\nBets: ${result.betDetails.count}\nTotal WC: ${result.betDetails.totalAmount}\n\nWould you like to FORCE DELETE this match and ALL its bets? This cannot be undone!`;
+        
+        if (confirm(confirmMessage)) {
+          // Recursive call with force = true
+          await deleteMatch(matchId, true);
+        }
       } else {
         throw new Error(result.error);
       }
@@ -339,34 +352,36 @@ const CompleteDynamicAdminPanel = () => {
                         </h3>
                         <p className="text-gray-400 text-sm">
                           {match.event_name} • {match.weight_class}
-                        </p>
-                        <p className="text-gray-500 text-xs mt-1">
-                          ID: {match.id.slice(0, 8)}... • Created: {new Date(match.created_at).toLocaleDateString()}
+                          {match.match_date && (
+                            <span className="ml-2 text-gray-500">
+                              • {new Date(match.match_date).toLocaleDateString()}
+                            </span>
+                          )}
                         </p>
                         
                         {/* Match Statistics */}
-                        {match.stats && (
-                          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            <div>
-                              <span className="text-gray-400">Bets:</span>
-                              <span className="text-white ml-1">{match.stats.totalBets}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Votes:</span>
-                              <span className="text-white ml-1">{match.stats.totalVotes}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Pool:</span>
-                              <span className="text-white ml-1">{match.stats.totalPool} WC</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Odds:</span>
-                              <span className="text-white ml-1">
-                                {match.stats.wrestler1Odds} / {match.stats.wrestler2Odds}
-                              </span>
-                            </div>
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-400">Bets:</span>
+                            <span className={`ml-1 font-medium ${
+                              (match.totalBets || 0) > 0 ? 'text-yellow-400' : 'text-white'
+                            }`}>
+                              {match.totalBets || 0}
+                            </span>
                           </div>
-                        )}
+                          <div>
+                            <span className="text-gray-400">Votes:</span>
+                            <span className="text-white ml-1">{match.totalVotes || 0}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Pool:</span>
+                            <span className="text-white ml-1">{match.totalPool || 0} WC</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">ID:</span>
+                            <span className="text-gray-500 ml-1 font-mono text-xs">{match.id.slice(0, 8)}...</span>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="flex flex-col items-end space-y-2">
@@ -408,9 +423,18 @@ const CompleteDynamicAdminPanel = () => {
                           
                           <button
                             onClick={() => deleteMatch(match.id)}
-                            className="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-xs"
+                            className={`px-3 py-1 rounded text-xs font-medium ${
+                              (match.totalBets || 0) > 0 
+                                ? 'bg-orange-700 hover:bg-orange-600 text-white border border-orange-500' 
+                                : 'bg-red-700 hover:bg-red-600 text-white'
+                            }`}
+                            title={
+                              (match.totalBets || 0) > 0 
+                                ? `Delete (has ${match.totalBets} bets - will require confirmation)` 
+                                : 'Delete match'
+                            }
                           >
-                            Delete
+                            {(match.totalBets || 0) > 0 ? '⚠️ Delete' : 'Delete'}
                           </button>
                         </div>
                       </div>

@@ -1,12 +1,15 @@
 import { supabase } from '../../../lib/supabase'
-import { NextResponse } from 'next/server'
+
+// Dynamic export configuration for Next.js
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Input validation helper
 const validateBetInput = (data) => {
   const { userId, matchId, wrestlerChoice, betAmount, odds } = data
   
   if (!userId || !matchId || !wrestlerChoice) {
-    return { isValid: false, error: 'Missing required fields' }
+    return { isValid: false, error: 'Missing required fields: userId, matchId, or wrestlerChoice' }
   }
   
   if (typeof betAmount !== 'number' || betAmount <= 0 || betAmount > 10000) {
@@ -17,17 +20,24 @@ const validateBetInput = (data) => {
     return { isValid: false, error: 'Invalid odds (must be >= 1.1)' }
   }
   
+  if (!['wrestler1', 'wrestler2'].includes(wrestlerChoice)) {
+    return { isValid: false, error: 'Invalid wrestler choice (must be wrestler1 or wrestler2)' }
+  }
+  
   return { isValid: true }
 }
 
 export async function POST(request) {
   try {
+    console.log('💰 Betting API called');
     const requestData = await request.json()
+    console.log('📊 Request data:', requestData);
     
     // Validate input
     const validation = validateBetInput(requestData)
     if (!validation.isValid) {
-      return NextResponse.json(
+      console.error('❌ Validation failed:', validation.error);
+      return Response.json(
         { success: false, error: validation.error },
         { status: 400 }
       )
@@ -37,11 +47,14 @@ export async function POST(request) {
 
     // Check if Supabase is configured
     const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    console.log('🔌 Supabase configured:', supabaseConfigured);
     
     if (!supabaseConfigured) {
+      console.log('⚠️ Running in demo mode - Supabase not configured');
       // Return success response for demo mode
-      return NextResponse.json({
+      return Response.json({
         success: true,
+        demo: true,
         bet: {
           id: `demo-${Date.now()}`,
           user_id: userId,
@@ -58,47 +71,62 @@ export async function POST(request) {
     }
 
     try {
-      // Insert new bet with error handling
-      const { data: bet, error } = await supabase
+      // Step 1: Verify match exists
+      console.log('🔍 Verifying match exists:', matchId);
+      const { data: matchCheck, error: matchError } = await supabase
+        .from('matches')
+        .select('id, wrestler1, wrestler2')
+        .eq('id', matchId)
+        .single();
+
+      if (matchError) {
+        console.error('❌ Match verification failed:', matchError);
+        throw new Error(`Match not found: ${matchError.message}`);
+      }
+
+      console.log('✅ Match verified:', matchCheck);
+
+      // Step 2: Insert new bet with detailed logging
+      console.log('� Inserting bet into database...');
+      const betData = {
+        user_id: userId,
+        match_id: matchId,
+        wrestler_choice: wrestlerChoice,
+        amount: betAmount,
+        odds: odds,
+        status: 'pending'
+      };
+      console.log('📊 Bet data to insert:', betData);
+
+      const { data: bet, error: betError } = await supabase
         .from('bets')
-        .insert({
-          user_id: userId,
-          match_id: matchId,
-          wrestler_choice: wrestlerChoice,
-          amount: betAmount, // Changed from bet_amount to amount
-          odds: odds,
-          status: 'pending'
-        })
+        .insert(betData)
         .select()
         .single()
 
-      if (error) {
-        console.error('Database error:', error)
-        throw new Error(`Failed to create bet: ${error.message}`)
+      if (betError) {
+        console.error('❌ Bet insertion failed:', betError);
+        throw new Error(`Failed to create bet: ${betError.message}`)
       }
 
-      // CRITICAL: Update match table with new odds and pools
-      // This should trigger the database function to recalculate odds
-      console.log('🔄 Triggering match odds update for match:', matchId);
+      console.log('✅ Bet inserted successfully:', bet);
+
+      // Step 3: Calculate updated odds and pools
+      console.log('🔄 Calculating updated odds and pools...');
       
-      // Call the database function to recalculate odds
-      const { data: oddsUpdate, error: oddsError } = await supabase
-        .rpc('calculate_match_odds', { match_id: matchId });
-
-      if (oddsError) {
-        console.warn('⚠️ Warning: Could not update match odds:', oddsError.message);
-      } else {
-        console.log('✅ Match odds updated:', oddsUpdate);
-      }
-
-      // Manually update the match table with recalculated values
+      // Get all bets for this match
       const { data: allBets, error: betsError } = await supabase
         .from('bets')
         .select('wrestler_choice, amount')
         .eq('match_id', matchId)
         .eq('status', 'pending');
 
-      if (betsError) throw betsError;
+      if (betsError) {
+        console.error('❌ Error fetching all bets:', betsError);
+        throw betsError;
+      }
+
+      console.log(`📊 Found ${allBets?.length || 0} total bets for match:`, allBets);
 
       // Calculate pool totals
       const wrestler1Pool = allBets
@@ -111,29 +139,37 @@ export async function POST(request) {
       
       const totalPool = wrestler1Pool + wrestler2Pool;
 
+      console.log('💰 Pool calculations:', {
+        wrestler1Pool,
+        wrestler2Pool,
+        totalPool
+      });
+
       // Calculate dynamic odds (minimum 1.10)
       const odds1 = wrestler1Pool > 0 ? Math.max(1.10, totalPool / wrestler1Pool) : 1.10;
       const odds2 = wrestler2Pool > 0 ? Math.max(1.10, totalPool / wrestler2Pool) : 1.10;
 
-      // Update match table with new odds and pools
+      console.log('🎲 Calculated odds:', { odds1, odds2 });
+
+      // Step 4: Update match table with new odds and pools
+      console.log('🔄 Updating match table...');
       const { error: matchUpdateError } = await supabase
         .from('matches')
         .update({
           odds_wrestler1: odds1.toFixed(2),
           odds_wrestler2: odds2.toFixed(2),
-          total_pool: totalPool
+          wrestler1_pool: wrestler1Pool,
+          wrestler2_pool: wrestler2Pool,
+          total_pool: totalPool,
+          updated_at: new Date().toISOString()
         })
         .eq('id', matchId);
 
       if (matchUpdateError) {
-        console.warn('⚠️ Warning: Could not update match table:', matchUpdateError.message);
+        console.error('❌ Match update failed:', matchUpdateError);
+        // Don't throw here - bet was successful, just odds update failed
       } else {
-        console.log('✅ Match table updated with new odds and pool:', {
-          matchId,
-          odds1: odds1.toFixed(2),
-          odds2: odds2.toFixed(2),
-          totalPool
-        });
+        console.log('✅ Match table updated successfully');
       }
 
       // Calculate final response data
@@ -147,35 +183,34 @@ export async function POST(request) {
         wrestler2: odds2.toFixed(2)
       };
 
-      return Response.json({
+      const response = {
         success: true,
         bet: bet,
         newOdds: newOdds,
-        wrestlerTotals: wrestlerTotals
-      })
+        wrestlerTotals: wrestlerTotals,
+        totalPool: totalPool
+      };
+
+      console.log('✅ Betting API success response:', response);
+      return Response.json(response);
+
     } catch (dbError) {
-      console.log('⚠️ Database error, returning demo response:', dbError.message);
-      // Return success response for demo mode when database fails
-      return NextResponse.json({
-        success: true,
-        bet: {
-          id: `demo-${Date.now()}`,
-          user_id: userId,
-          match_id: matchId,
-          wrestler_choice: wrestlerChoice,
-          bet_amount: betAmount,
-          odds: odds,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        },
-        newOdds: { [wrestlerChoice]: odds },
-        wrestlerTotals: { [wrestlerChoice]: betAmount }
-      })
+      console.error('❌ Database error:', dbError);
+      // Return detailed error for debugging
+      return Response.json({
+        success: false,
+        error: `Database error: ${dbError.message}`,
+        details: dbError
+      }, { status: 500 });
     }
   } catch (error) {
     console.error('❌ Bets POST API error:', error);
     return Response.json(
-      { success: false, error: 'Failed to process bet' },
+      { 
+        success: false, 
+        error: `Failed to process bet: ${error.message}`,
+        details: error 
+      },
       { status: 500 }
     )
   }
