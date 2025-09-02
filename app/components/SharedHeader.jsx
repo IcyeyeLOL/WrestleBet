@@ -212,50 +212,49 @@ const SharedHeader = ({ onTogglePurchaseModal, showPurchaseModal }) => {
 
             {/* Mobile Menu Button & Controls */}
             <div className="flex items-center gap-0.5 md:hidden">
-              <DailyBonusButton size="small" />
-              <BalanceDisplay 
-                size="small" 
-                onTogglePurchaseModal={onTogglePurchaseModal}
-                showPurchaseModal={showPurchaseModal}
-              />
-              
               {/* Mobile Auth */}
               {isLoaded && (
                 <>
                   {isSignedIn ? (
-                    <UserButton
-                      appearance={{
-                        elements: {
-                          avatarBox: "w-7 h-7 ring-1 ring-yellow-400/20",
-                        },
-                      }}
-                      afterSignOutUrl="/"
-                    />
+                    <>
+                      <DailyBonusButton size="mini" />
+                      <BalanceDisplay 
+                        size="mini" 
+                        onTogglePurchaseModal={onTogglePurchaseModal}
+                        showPurchaseModal={showPurchaseModal}
+                      />
+                      <UserButton
+                        appearance={{
+                          elements: {
+                            avatarBox: "w-7 h-7 ring-1 ring-yellow-400/20",
+                          },
+                        }}
+                        afterSignOutUrl="/"
+                      />
+                    </>
                   ) : (
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-1">
                       <button 
                         onClick={openSignIn}
-                        className="group relative bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black px-1.5 py-1 rounded-md text-xs font-bold shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
+                        className="group relative bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black px-3 py-2 rounded text-sm font-bold shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
                       >
-                        <span className="relative z-10 flex items-center gap-0.5">
-                          <svg className="w-2 h-2 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 20 20">
+                        <span className="relative z-10 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          <span className="hidden xs:inline">Sign In</span>
-                          <span className="xs:hidden">In</span>
+                          <span>Sign In</span>
                         </span>
                         <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </button>
                       <button 
                         onClick={openSignUp}
-                        className="group relative bg-transparent border border-yellow-500/60 text-yellow-400 hover:border-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/5 px-1.5 py-1 rounded-md text-xs font-bold transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
+                        className="group relative bg-transparent border border-yellow-500/60 text-yellow-400 hover:border-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/5 px-3 py-2 rounded text-sm font-bold transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
                       >
-                        <span className="relative z-10 flex items-center gap-0.5">
-                          <svg className="w-2 h-2 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 20 20">
+                        <span className="relative z-10 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                           </svg>
-                          <span className="hidden xs:inline">Join</span>
-                          <span className="xs:hidden">+</span>
+                          <span>Join</span>
                         </span>
                         <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 to-yellow-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </button>

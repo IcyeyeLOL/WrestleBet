@@ -14,6 +14,7 @@ const BalanceDisplay = ({ showDetails = false, size = 'normal', onTogglePurchase
   
   // Size variants
   const sizeClasses = {
+    mini: 'px-1 py-1 text-xs',
     small: 'px-3 py-2 text-sm',
     normal: 'px-4 py-3 text-base',
     large: 'px-6 py-4 text-lg'
