@@ -1,0 +1,21 @@
+# Environment Variables Template
+# Copy this file to .env.local for local development
+# Set these variables in your deployment platform (Netlify/Vercel)
+
+# Node.js Configuration
+NODE_VERSION=20
+NODE_ENV=production
+
+# Clerk Authentication (REQUIRED)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_bG9naWNhbC1ncmFja2xlLTUuY2xlcmsuYWNjb3VudHMuZGV2JA
+CLERK_SECRET_KEY=your_clerk_secret_key_here
+
+# Supabase Database (CRITICAL FOR BUILD)
+NEXT_PUBLIC_SUPABASE_URL=https://hpkxmotzidywoilooqpx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwa3htb3R6aWR5d29pbG9vcXB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyODg2MzcsImV4cCI6MjA2OTg2NDYzN30.KbbrGQPzXcO3SBRvXk2ySdCzprNiUXCnQZdiQRgCuNc
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+
+# Stripe Payments (Optional)
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
+STRIPE_SECRET_KEY=your_stripe_secret_key_here
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
