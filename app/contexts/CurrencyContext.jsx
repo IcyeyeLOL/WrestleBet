@@ -2,12 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import globalDataSync from '../lib/globalDataSync';
+import { APP_CONFIG } from '../lib/constants';
 
 const CurrencyContext = createContext();
 
 // Constants
-const STARTING_BALANCE = 1000;
-const DAILY_BONUS_AMOUNT = 50;
+const STARTING_BALANCE = APP_CONFIG.currency.startingBalance;
+const DAILY_BONUS_AMOUNT = APP_CONFIG.currency.dailyBonus;
 
 // Enhanced precision helpers
 const preciseCurrencyCalculation = (amount) => {

@@ -17,29 +17,25 @@ const isPublicRoute = createRouteMatcher([
   '/sso-callback(.*)',
   '/donation(.*)',
   '/stripe-test(.*)',
-  '/admin(.*)' // Allow admin routes without authentication
-]);
-
-// Define admin routes that require admin privileges
-const isAdminRoute = createRouteMatcher([
-  '/admin(.*)',
-  '/api/admin(.*)'
+  '/admin(.*)', // Allow admin routes without authentication
+  '/bets(.*)', // Allow bets page - authentication handled by component
+  '/account(.*)', // Allow account page - authentication handled by component
+  '/donation(.*)', // Allow donation page - authentication handled by component
+  '/simple-test(.*)', // Allow simple test page
+  '/bets-simple(.*)', // Allow simple bets page
+  '/account-simple(.*)', // Allow simple account page
+  '/nav-test(.*)', // Allow navigation test page
+  '/debug(.*)' // Allow debug page
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Protect all routes except public ones
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  // Allow public routes to pass through
+  if (isPublicRoute(req)) {
+    return;
   }
   
-  // Admin routes are now public - authentication is handled by the AdminLayout component
-  // This allows users to access /admin and enter the admin key without being forced to sign in first
-}, { 
-  debug: process.env.NODE_ENV === 'development',
-  signInUrl: '/sign-in',
-  signUpUrl: '/sign-up',
-  afterSignInUrl: '/',
-  afterSignUpUrl: '/'
+  // Protect all other routes
+  await auth.protect();
 });
 
 export const config = {

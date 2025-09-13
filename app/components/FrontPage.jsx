@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useBetting } from '../contexts/SimpleBettingContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useUser } from '@clerk/nextjs';
-import SharedHeader from './SharedHeader';
+import Navigation from './Navigation';
 import BettingModal from './BettingModal';
 import PurchaseWCModal from './PurchaseWCModal';
 import AuthModal from './AuthModal';
@@ -868,7 +868,7 @@ const FrontPage = () => {
   if (!isLoaded) {
     return (
       <div className="font-inter overflow-x-hidden text-white">
-        <SharedHeader />
+        <Navigation />
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto mb-4"></div>
@@ -886,10 +886,7 @@ const FrontPage = () => {
 
   return (
     <div className="font-inter overflow-x-hidden text-white bg-gradient-wrestlebet min-h-screen">
-      <SharedHeader 
-        onTogglePurchaseModal={() => setShowPurchaseModal(!showPurchaseModal)}
-        showPurchaseModal={showPurchaseModal}
-      />
+      <Navigation />
       
       {showPurchaseModal && (
         <PurchaseWCModal

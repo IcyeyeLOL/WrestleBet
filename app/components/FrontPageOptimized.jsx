@@ -4,9 +4,10 @@ import { useBetting } from '../contexts/SimpleBettingContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useGlobalState } from '../contexts/GlobalStateContext';
 import { useUser } from '@clerk/nextjs';
-import SharedHeader from './SharedHeader';
+import Navigation from './Navigation';
 import globalStorage from '../lib/globalStorage';
 import { supabase } from '../../lib/supabase';
+import { APP_CONFIG, ANIMATION_DELAYS } from '../lib/constants';
 import '../styles/front-page.css';
 import '../styles/match-cards.css';
 import '../styles/simplified.css';
@@ -33,14 +34,14 @@ const HeroSection = React.memo(() => (
     
     <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
       <h1 className="hero-title animate-fadeInUp">
-        Welcome to WrestleBet
+        Welcome to {APP_CONFIG.name}
       </h1>
-      <p className="hero-subtitle animate-fadeInUp" style={{ animationDelay: '0.2s' }}>
-        The Ultimate Wrestling Betting Experience
+      <p className="hero-subtitle animate-fadeInUp" style={{ animationDelay: `${ANIMATION_DELAYS.hero.subtitle}ms` }}>
+        {APP_CONFIG.tagline}
       </p>
-      <div className="mt-8 animate-fadeInUp" style={{ animationDelay: '0.4s' }}>
+      <div className="mt-8 animate-fadeInUp" style={{ animationDelay: `${ANIMATION_DELAYS.hero.features}ms` }}>
         <div className="inline-flex items-center px-6 py-3 bg-yellow-400/20 backdrop-blur-sm border border-yellow-400/30 rounded-full">
-          <span className="text-yellow-400 font-semibold">🏆 Live Betting • Real Prizes • Instant Payouts</span>
+          <span className="text-yellow-400 font-semibold">{APP_CONFIG.features.join(' • ')}</span>
         </div>
       </div>
     </div>
@@ -517,24 +518,7 @@ const FrontPageOptimized = () => {
 
   return (
     <div className="bg-gradient-wrestlebet min-h-screen">
-      <SharedHeader 
-        balance={getFormattedBalance()} 
-        onPurchaseClick={() => setShowPurchaseModal(true)}
-      />
-      
-      {/* Debug Refresh Button - Remove in production */}
-      <div className="fixed top-20 right-4 z-50">
-        <button
-          onClick={() => {
-            console.log('🔄 Manual refresh triggered globally');
-            loadMatches();
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg transition-colors"
-          title="Refresh matches (Debug)"
-        >
-          🔄 Refresh
-        </button>
-      </div>
+      <Navigation />
       
       <HeroSection />
       

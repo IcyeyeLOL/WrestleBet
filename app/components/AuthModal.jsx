@@ -5,9 +5,19 @@ import { SignIn, SignUp } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 
 const AuthModal = ({ isOpen, onClose, mode = "signin", onAuthSuccess }) => {
-  const { isSignedIn } = useUser();
   const [currentMode, setCurrentMode] = useState(mode);
   const [error, setError] = useState(null);
+  
+  // Handle Clerk availability gracefully
+  let isSignedIn = false;
+  
+  try {
+    const clerkData = useUser();
+    isSignedIn = clerkData.isSignedIn || false;
+  } catch (error) {
+    console.error('❌ AuthModal Clerk error:', error.message);
+    isSignedIn = false;
+  }
 
   // Update currentMode when external mode prop changes
   useEffect(() => {

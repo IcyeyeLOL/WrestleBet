@@ -1,0 +1,15 @@
+@echo off
+echo Setting up WrestleBet development environment...
+
+REM Set environment variables
+set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_bG9naWNhbC1ncmFja2xlLTUuY2xlcmsuYWNjb3VudHMuZGV2JA
+set NEXT_PUBLIC_SUPABASE_URL=https://hpkxmotzidywoilooqpx.supabase.co
+set NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwa3htb3R6aWR5d29pbG9vcXB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyODg2MzcsImV4cCI6MjA2OTg2NDYzN30.KbbrGQPzXcO3SBRvXk2ySdCzprNiUXCnQZdiQRgCuNc
+
+echo Environment variables set successfully!
+echo Starting development server...
+
+REM Start the development server
+npm run dev
+
+pause

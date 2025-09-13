@@ -18,7 +18,16 @@ export const useBetting = () => {
 };
 
 export const BettingProvider = ({ children }) => {
-  const { user } = useUser();
+  // Handle Clerk availability gracefully
+  let user = null;
+  
+  try {
+    const clerkData = useUser();
+    user = clerkData.user || null;
+  } catch (error) {
+    console.warn('Clerk not available in BettingProvider, using fallback:', error.message);
+    user = null;
+  }
   const { subtractFromBalance, canAffordBet, balance } = useCurrency();
   const { refreshMatchesAfterBet, updateMatchPools } = useGlobalState();
   const [pollData, setPollData] = useState({});

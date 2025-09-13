@@ -1,10 +1,9 @@
 import { Inter, Roboto_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 import "./globals.css";
-import { GlobalStateProvider } from './contexts/GlobalStateContext';
-import { CurrencyProvider } from './contexts/CurrencyContext';
-import { BettingProvider } from './contexts/SimpleBettingProviderWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
+import ConditionalContextProvider from './components/ConditionalContextProvider';
+import { APP_CONFIG } from './lib/constants';
 
 const inter = Inter({
   variable: "--font-inter",
@@ -19,10 +18,10 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata = {
-  title: "WrestleBet - Wrestling Betting Platform",
-  description: "Bet on wrestling matches with WrestleCoins",
+  title: `${APP_CONFIG.name} - ${APP_CONFIG.tagline}`,
+  description: APP_CONFIG.description,
   keywords: "wrestling, betting, sports, WrestleCoins, matches",
-  authors: [{ name: "WrestleBet Team" }],
+  authors: [{ name: `${APP_CONFIG.name} Team` }],
 };
 
 export const viewport = {
@@ -32,14 +31,15 @@ export const viewport = {
   userScalable: false,
 };
 
+
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider 
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      afterSignInUrl="/"
-      afterSignUpUrl="/"
+      signInUrl={process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL || "/sign-in"}
+      signUpUrl={process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL || "/sign-up"}
+      fallbackRedirectUrl={process.env.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || "/"}
+      forceRedirectUrl={process.env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || "/"}
       appearance={{
         elements: {
           rootBox: "mx-auto",
@@ -52,13 +52,9 @@ export default function RootLayout({ children }) {
           className={`${inter.variable} ${robotoMono.variable} antialiased`}
         >
           <ErrorBoundary>
-            <GlobalStateProvider>
-              <CurrencyProvider>
-                <BettingProvider>
-                  {children}
-                </BettingProvider>
-              </CurrencyProvider>
-            </GlobalStateProvider>
+            <ConditionalContextProvider>
+              {children}
+            </ConditionalContextProvider>
           </ErrorBoundary>
         </body>
       </html>

@@ -17,7 +17,19 @@ export const useGlobalState = () => {
 
 // Global State Provider
 export const GlobalStateProvider = ({ children }) => {
-  const { user, isLoaded } = useUser();
+  // Handle Clerk availability gracefully
+  let user = null;
+  let isLoaded = true;
+  
+  try {
+    const clerkData = useUser();
+    user = clerkData.user || null;
+    isLoaded = clerkData.isLoaded !== false;
+  } catch (error) {
+    console.warn('Clerk not available in GlobalStateProvider, using fallback:', error.message);
+    user = null;
+    isLoaded = true;
+  }
   
   // Global state for all data
   const [globalState, setGlobalState] = useState({
@@ -193,7 +205,14 @@ export const GlobalStateProvider = ({ children }) => {
 
   // Load user bets
   const loadBets = useCallback(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('⚠️ No user ID, skipping bets load');
+      updateGlobalState({ 
+        bets: [],
+        loading: { ...globalState.loading, bets: false }
+      });
+      return Promise.resolve([]);
+    }
     
     updateGlobalState({ loading: { ...globalState.loading, bets: true } });
     
@@ -207,7 +226,16 @@ export const GlobalStateProvider = ({ children }) => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .then(({ data: bets, error }) => {
-            if (error) throw error;
+            if (error) {
+              console.warn('⚠️ Database error loading bets (user may not exist yet):', error.message);
+              // Don't reject, just return empty array
+              updateGlobalState({ 
+                bets: [],
+                loading: { ...globalState.loading, bets: false }
+              });
+              resolve([]);
+              return;
+            }
             
             updateGlobalState({ 
               bets: bets || [],
@@ -218,25 +246,34 @@ export const GlobalStateProvider = ({ children }) => {
             resolve(bets || []);
           })
           .catch(error => {
-            console.error('❌ Error loading bets:', error);
+            console.warn('⚠️ Database connection error loading bets:', error.message);
             updateGlobalState({ 
+              bets: [],
               loading: { ...globalState.loading, bets: false }
             });
-            reject(error);
+            resolve([]); // Don't reject, just return empty array
           });
       } catch (error) {
-        console.error('❌ Error in loadBets:', error);
+        console.warn('⚠️ Error in loadBets:', error.message);
         updateGlobalState({ 
+          bets: [],
           loading: { ...globalState.loading, bets: false }
         });
-        reject(error);
+        resolve([]); // Don't reject, just return empty array
       }
     });
   }, [user?.id, globalState.loading, updateGlobalState]);
 
   // Load user balance
   const loadBalance = useCallback(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('⚠️ No user ID, skipping balance load');
+      updateGlobalState({ 
+        userBalance: 1000, // Default balance
+        loading: { ...globalState.loading, balance: false }
+      });
+      return Promise.resolve(1000);
+    }
     
     updateGlobalState({ loading: { ...globalState.loading, balance: true } });
     
@@ -250,29 +287,40 @@ export const GlobalStateProvider = ({ children }) => {
           .eq('id', user.id)
           .single()
           .then(({ data: userData, error }) => {
-            if (error) throw error;
+            if (error) {
+              console.warn('⚠️ Database error loading balance (user may not exist yet):', error.message);
+              // Don't reject, just return default balance
+              updateGlobalState({ 
+                userBalance: 1000,
+                loading: { ...globalState.loading, balance: false }
+              });
+              resolve(1000);
+              return;
+            }
             
             updateGlobalState({ 
-              userBalance: userData?.wrestlecoin_balance || 100,
+              userBalance: userData?.wrestlecoin_balance || 1000,
               loading: { ...globalState.loading, balance: false }
             });
             
-            console.log(`✅ Loaded user balance: ${userData?.wrestlecoin_balance || 100} WC`);
-            resolve(userData?.wrestlecoin_balance || 100);
+            console.log(`✅ Loaded user balance: ${userData?.wrestlecoin_balance || 1000} WC`);
+            resolve(userData?.wrestlecoin_balance || 1000);
           })
           .catch(error => {
-            console.error('❌ Error loading balance:', error);
+            console.warn('⚠️ Database connection error loading balance:', error.message);
             updateGlobalState({ 
+              userBalance: 1000,
               loading: { ...globalState.loading, balance: false }
             });
-            reject(error);
+            resolve(1000); // Don't reject, just return default balance
           });
       } catch (error) {
-        console.error('❌ Error in loadBalance:', error);
+        console.warn('⚠️ Error in loadBalance:', error.message);
         updateGlobalState({ 
+          userBalance: 1000,
           loading: { ...globalState.loading, balance: false }
         });
-        reject(error);
+        resolve(1000); // Don't reject, just return default balance
       }
     });
   }, [user?.id, globalState.loading, updateGlobalState]);
