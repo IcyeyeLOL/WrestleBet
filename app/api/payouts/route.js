@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
-import { supabaseAdmin } from '../../../lib/supabase-admin';
+import { supabaseAdmin } from '../../../lib/supabase-admin.js';
 
 export const revalidate = 0;
 

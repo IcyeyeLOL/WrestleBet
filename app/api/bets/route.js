@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase'
-import { supabaseAdmin } from '../../../lib/supabase-admin'
+import { supabaseAdmin } from '../../../lib/supabase-admin.js'
 
 // Dynamic export configuration for Next.js API routes
 export const dynamic = 'force-dynamic'
