@@ -1,23 +1,28 @@
 import { Inter, Roboto_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 import "./globals.css";
-import { BettingProvider } from './contexts/SimpleBettingContext';
+import { GlobalStateProvider } from './contexts/GlobalStateContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
-import ClerkDebugger from './components/ClerkDebugger';
+import { BettingProvider } from './contexts/SimpleBettingProviderWrapper';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: 'swap',
 });
 
 const robotoMono = Roboto_Mono({
   variable: "--font-roboto-mono",
   subsets: ["latin"],
+  display: 'swap',
 });
 
 export const metadata = {
   title: "WrestleBet - Wrestling Betting Platform",
   description: "Bet on wrestling matches with WrestleCoins",
+  keywords: "wrestling, betting, sports, WrestleCoins, matches",
+  authors: [{ name: "WrestleBet Team" }],
 };
 
 export const viewport = {
@@ -46,12 +51,15 @@ export default function RootLayout({ children }) {
         <body
           className={`${inter.variable} ${robotoMono.variable} antialiased`}
         >
-          <BettingProvider>
-            <CurrencyProvider>
-              <ClerkDebugger />
-              {children}
-            </CurrencyProvider>
-          </BettingProvider>
+          <ErrorBoundary>
+            <GlobalStateProvider>
+              <CurrencyProvider>
+                <BettingProvider>
+                  {children}
+                </BettingProvider>
+              </CurrencyProvider>
+            </GlobalStateProvider>
+          </ErrorBoundary>
         </body>
       </html>
     </ClerkProvider>

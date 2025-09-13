@@ -9,6 +9,8 @@ const AdminMatchControl = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [deleting, setDeleting] = useState({});
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     wrestler1: '',
     wrestler2: '',
@@ -24,6 +26,7 @@ const AdminMatchControl = () => {
 
   const loadMatches = async () => {
     setLoading(true);
+    setError('');
     try {
       const url = selectedStatus !== 'all' 
         ? `/api/admin/matches?status=${selectedStatus}` 
@@ -109,7 +112,7 @@ const AdminMatchControl = () => {
       // Fallback to sample data for demo
       setMatches([
         {
-          id: 'demo-match-1',
+          id: '550e8400-e29b-41d4-a716-446655440000',
           wrestler1: 'John Smith',
           wrestler2: 'Mike Johnson',
           event_name: 'Demo Tournament',
@@ -152,20 +155,39 @@ const AdminMatchControl = () => {
       });
 
       const data = result.data;
-      // If API fails (e.g., Supabase not configured), create locally
-      if (!result.success || !data.success) {
-        console.log('Creating match in demo mode (local only):', data?.error || 'API not available');
+      
+      // Check if API creation was successful
+      if (result.success && data.success) {
+        // API creation successful - no need for local fallback
+        console.log('✅ Match created via API:', data.match);
+        await loadMatches(); // Reload matches
+        setShowCreateForm(false);
+        setFormData({ 
+          wrestler1: '', 
+          wrestler2: '', 
+          eventName: '', 
+          weightClass: '', 
+          matchDate: '',
+          matchTime: '' 
+        });
+        alert('✅ Match created successfully! It will appear on the front page shortly.');
+        return; // Exit early - no local creation needed
       }
 
-      // Build a canonical match object for local storage/front-end
-      const generateUniqueId = (wrestler1, wrestler2) => {
-        const baseId = `${wrestler1?.toLowerCase().replace(/\s+/g,'')}-${wrestler2?.toLowerCase().replace(/\s+/g,'')}`;
-        const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
-        return `${baseId}-${timestamp}`;
+      // API failed - create locally as fallback
+      console.log('Creating match in demo mode (local only):', data?.error || 'API not available');
+      
+      const generateUniqueId = () => {
+        // Generate a proper UUID v4 format
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c == 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
       };
 
       const newMatch = {
-        id: generateUniqueId(formData.wrestler1, formData.wrestler2),
+        id: generateUniqueId(),
         wrestler1: formData.wrestler1,
         wrestler2: formData.wrestler2,
         event_name: formData.eventName,
@@ -198,57 +220,11 @@ const AdminMatchControl = () => {
         matchDate: '',
         matchTime: '' 
       });
-      alert('✅ Match created! It will appear on the front page shortly.');
+      alert('✅ Match created locally! It will appear on the front page shortly.');
+      
     } catch (error) {
       console.error('Failed to create match:', error);
-      
-      // If API failed, try to create locally as fallback
-      try {
-        const generateUniqueId = (wrestler1, wrestler2) => {
-          const baseId = `${wrestler1?.toLowerCase().replace(/\s+/g,'')}-${wrestler2?.toLowerCase().replace(/\s+/g,'')}`;
-          const timestamp = Date.now().toString().slice(-6);
-          return `${baseId}-${timestamp}`;
-        };
-
-        const newMatch = {
-          id: generateUniqueId(formData.wrestler1, formData.wrestler2),
-          wrestler1: formData.wrestler1,
-          wrestler2: formData.wrestler2,
-          event_name: formData.eventName,
-          weight_class: formData.weightClass,
-          match_date: formData.matchDate || null,
-          status: 'upcoming',
-          total_bets: 0,
-          total_votes: 0,
-          created_at: new Date().toISOString()
-        };
-
-        // Save to global storage
-        const current = globalStorage.get('admin_demo_matches') || [];
-        const list = Array.isArray(current) ? current : [];
-        list.push(newMatch);
-        globalStorage.set('admin_demo_matches', list);
-
-        // Notify frontend
-        try {
-          window.dispatchEvent(new CustomEvent('admin-match-created'));
-        } catch {}
-
-        await loadMatches();
-        setShowCreateForm(false);
-        setFormData({ 
-          wrestler1: '', 
-          wrestler2: '', 
-          eventName: '', 
-          weightClass: '', 
-          matchDate: '',
-          matchTime: '' 
-        });
-        alert('✅ Match created locally! It will appear on the front page shortly.');
-      } catch (localError) {
-        console.error('Failed to create match locally:', localError);
-        alert('❌ Failed to create match. Check console for details.');
-      }
+      alert('❌ Failed to create match. Check console for details.');
     } finally {
       setLoading(false);
     }
@@ -308,14 +284,19 @@ const AdminMatchControl = () => {
   };
 
   const handleDeleteMatch = async (matchId, force = false) => {
-    const match = matches.find(m => m.id === matchId);
-    const matchName = match ? `${match.wrestler1 || match.wrestler_1} vs ${match.wrestler2 || match.wrestler_2}` : 'this match';
-    
-    if (!force) {
-      if (!window.confirm(`🗑️ Delete ${matchName}?\n\n⚠️ This will remove the match and all associated bets. This action cannot be undone!`)) return;
-    }
-
     try {
+      setDeleting(prev => ({ ...prev, [matchId]: true }));
+      
+      const match = matches.find(m => m.id === matchId);
+      const matchName = match ? `${match.wrestler1 || match.wrestler_1} vs ${match.wrestler2 || match.wrestler_2}` : 'this match';
+      
+      if (!force) {
+        if (!window.confirm(`🗑️ Delete ${matchName}?\n\n⚠️ This will remove the match and all associated bets. This action cannot be undone!`)) {
+          setDeleting(prev => ({ ...prev, [matchId]: false }));
+          return;
+        }
+      }
+
       // Check if this is a demo match (created locally)
       const stored = globalStorage.get('admin_demo_matches') || [];
       const isDemoMatch = Array.isArray(stored) && stored.some(m => m.id === matchId);
@@ -364,37 +345,37 @@ const AdminMatchControl = () => {
 
         await loadMatches();
         alert(`✅ Match deleted successfully${force ? ' (including all bets)' : ''}!`);
-      } else if (data.requiresForce) {
-        // Show detailed error with force delete option
-        const confirmMessage = `${data.error}\n\nMatch: ${matchName}\nBets: ${data.betDetails.count}\nTotal WC: ${data.betDetails.totalAmount}\n\nWould you like to FORCE DELETE this match and ALL its bets? This cannot be undone!`;
-        
-        if (window.confirm(confirmMessage)) {
-          // Recursive call with force = true
-          await handleDeleteMatch(matchId, true);
-        }
       } else {
-        // If API fails, try local deletion as fallback
-        console.warn('API deletion failed, trying local deletion:', data.error);
-        try {
-          const stored = globalStorage.get('admin_demo_matches') || [];
-          if (Array.isArray(stored)) {
-            const arr = stored.filter(m => m.id !== matchId);
-            globalStorage.set('admin_demo_matches', arr);
+        // Check if the error message indicates bets exist (for force delete)
+        if (data.error && data.error.includes('bets') && !force) {
+          const confirmForce = confirm(
+            `This match has existing bets. ` +
+            'Do you want to force delete it? This will delete all associated bets.'
+          );
+          if (confirmForce) {
+            await handleDeleteMatch(matchId, true);
           }
-          
-          try {
-            window.dispatchEvent(new CustomEvent('admin-match-deleted', { detail: { matchId } }));
-          } catch {}
-          
-          await loadMatches();
-          alert('✅ Match deleted locally (API unavailable)!');
-        } catch (localError) {
-          alert(`❌ Error: ${data.error}`);
+        } else {
+          alert(`Failed to delete match: ${data.error}`);
         }
       }
-    } catch (error) {
-      console.error('Error deleting match:', error);
-      alert(`❌ Failed to delete match: ${error.message}`);
+    } catch (err) {
+      alert('Error deleting match');
+      console.error('Error deleting match:', err);
+    } finally {
+      setDeleting(prev => ({ ...prev, [matchId]: false }));
+    }
+  };
+
+  // Delete all matches
+  const deleteAllMatches = async () => {
+    const confirmDelete = confirm('Are you sure you want to delete ALL matches? This action cannot be undone.');
+    if (!confirmDelete) return;
+
+    const confirmForce = confirm('Do you want to force delete matches that have bets? This will delete all associated bets.');
+    
+    for (const match of matches) {
+      await handleDeleteMatch(match.id, confirmForce);
     }
   };
 
@@ -406,13 +387,34 @@ const AdminMatchControl = () => {
           <h2 className="text-2xl font-bold text-white">🥊 Match Control</h2>
           <p className="text-gray-400">Create, manage, and end wrestling matches</p>
         </div>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-        >
-          <span>➕</span> Create Match
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={loadMatches}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          >
+            <span>🔄</span> Refresh
+          </button>
+          <button
+            onClick={deleteAllMatches}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          >
+            <span>🗑️</span> Delete All
+          </button>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          >
+            <span>➕</span> Create Match
+          </button>
+        </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Filter Section */}
       <div className="bg-gray-800 rounded-lg p-4">
@@ -441,12 +443,6 @@ const AdminMatchControl = () => {
               </button>
             ))}
           </div>
-          <button
-            onClick={loadMatches}
-            className="ml-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
-          >
-            🔄 Refresh
-          </button>
         </div>
       </div>
 
@@ -616,13 +612,13 @@ const AdminMatchControl = () => {
                       <div>
                         <span className="text-gray-400">💰 Total Betting Pool:</span>
                         <span className="ml-2 font-bold text-yellow-400">
-                          {(match.total_bets || 0).toFixed(2)} WC
+                          {(match.total_pool || 0).toFixed(2)} WC
                         </span>
                       </div>
                       <div>
                         <span className="text-gray-400">👥 Total Participants:</span>
                         <span className="ml-2 font-bold text-blue-400">
-                          {(match.total_votes || 0) + (match.total_bets || 0)} users
+                          {match.total_participants || 0} users
                         </span>
                       </div>
                     </div>
@@ -656,9 +652,14 @@ const AdminMatchControl = () => {
                   
                   <button 
                     onClick={() => handleDeleteMatch(match.id)}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    disabled={deleting[match.id]}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      deleting[match.id]
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
                   >
-                    🗑️ Delete
+                    {deleting[match.id] ? 'Deleting...' : '🗑️ Delete'}
                   </button>
                 </div>
               </div>

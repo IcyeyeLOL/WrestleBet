@@ -15,35 +15,35 @@ const DynamicMatchManager = () => {
   }, []);
 
   // Load all dynamic matches
-  const loadMatches = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const loadMatches = () => {
+    setLoading(true);
+    setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from('matches')
-        .select(`
-          *,
-          bets:bets(count),
-          votes:votes(count)
-        `)
-        .order('created_at', { ascending: false });
+    supabase
+      .from('matches')
+      .select(`
+        *,
+        bets:bets(count),
+        votes:votes(count)
+      `)
+      .order('created_at', { ascending: false })
+      .then(({ data, error: fetchError }) => {
+        if (fetchError) {
+          throw fetchError;
+        }
 
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      setMatches(data || []);
-      setRealTimeStatus('connected');
-      console.log('✅ Loaded dynamic matches:', data?.length || 0);
-
-    } catch (err) {
-      console.error('❌ Error loading matches:', err);
-      setError(err.message);
-      setRealTimeStatus('error');
-    } finally {
-      setLoading(false);
-    }
+        setMatches(data || []);
+        setRealTimeStatus('connected');
+        console.log('✅ Loaded dynamic matches:', data?.length || 0);
+      })
+      .catch(err => {
+        console.error('❌ Error loading matches:', err);
+        setError(err.message);
+        setRealTimeStatus('error');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   // Setup real-time synchronization

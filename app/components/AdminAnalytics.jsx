@@ -12,21 +12,23 @@ const AdminAnalytics = () => {
     loadAnalytics();
   }, [period, activeTab]);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = () => {
     setLoading(true);
-    try {
-      const response = await fetch(`/api/admin/analytics?period=${period}&type=${activeTab}`, {
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
-      const data = await response.json();
+    fetch(`/api/admin/analytics?period=${period}&type=${activeTab}`, {
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         setAnalyticsData(data.data);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to load analytics:', error);
-    } finally {
+    })
+    .finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   const formatNumber = (num) => {

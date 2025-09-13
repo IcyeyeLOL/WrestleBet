@@ -1,15 +1,40 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Basic configuration for Netlify
+  // Performance optimizations
   trailingSlash: false,
-  // Ensure proper image handling
+  poweredByHeader: false,
+  
+  // Image optimization
   images: {
     unoptimized: true,
+    formats: ['image/webp', 'image/avif'],
   },
-  // Disable static optimization for dynamic rendering
+  
+  // Experimental features for better performance
   experimental: {
-    // Disable static page generation
-    workerThreads: false,
+    optimizePackageImports: ['@clerk/nextjs', '@supabase/supabase-js'],
+  },
+  
+  // Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  
+  // Bundle analyzer for production builds
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+          },
+        },
+      };
+    }
+    return config;
   },
 };
 

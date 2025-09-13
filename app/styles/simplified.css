@@ -1,0 +1,376 @@
+/* Simplified WrestleBet Styles - Clean and Minimal */
+
+/* Simplified color themes - clean and distinct */
+.wrestler-theme-blue {
+  --primary-color: #3B82F6;
+  --primary-light: #60A5FA;
+  --primary-dark: #1E40AF;
+  --primary-bg: rgba(59, 130, 246, 0.1);
+  --primary-border: rgba(59, 130, 246, 0.3);
+}
+
+.wrestler-theme-red {
+  --primary-color: #EF4444;
+  --primary-light: #F87171;
+  --primary-dark: #B91C1C;
+  --primary-bg: rgba(239, 68, 68, 0.1);
+  --primary-border: rgba(239, 68, 68, 0.3);
+}
+
+.wrestler-theme-green {
+  --primary-color: #10B981;
+  --primary-light: #34D399;
+  --primary-dark: #047857;
+  --primary-bg: rgba(16, 185, 129, 0.1);
+  --primary-border: rgba(16, 185, 129, 0.3);
+}
+
+.wrestler-theme-purple {
+  --primary-color: #8B5CF6;
+  --primary-light: #A78BFA;
+  --primary-dark: #6D28D9;
+  --primary-bg: rgba(139, 92, 246, 0.1);
+  --primary-border: rgba(139, 92, 246, 0.3);
+}
+
+.wrestler-theme-orange {
+  --primary-color: #F59E0B;
+  --primary-light: #FBBF24;
+  --primary-dark: #D97706;
+  --primary-bg: rgba(245, 158, 11, 0.1);
+  --primary-border: rgba(245, 158, 11, 0.3);
+}
+
+.wrestler-theme-pink {
+  --primary-color: #EC4899;
+  --primary-light: #F472B6;
+  --primary-dark: #BE185D;
+  --primary-bg: rgba(236, 72, 153, 0.1);
+  --primary-border: rgba(236, 72, 153, 0.3);
+}
+
+.wrestler-theme-cyan {
+  --primary-color: #06B6D4;
+  --primary-light: #22D3EE;
+  --primary-dark: #0891B2;
+  --primary-bg: rgba(6, 182, 212, 0.1);
+  --primary-border: rgba(6, 182, 212, 0.3);
+}
+
+.wrestler-theme-indigo {
+  --primary-color: #6366F1;
+  --primary-light: #818CF8;
+  --primary-dark: #4338CA;
+  --primary-bg: rgba(99, 102, 241, 0.1);
+  --primary-border: rgba(99, 102, 241, 0.3);
+}
+
+/* Match card themes - subtle background variations */
+.match-card-blue {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.match-card-green {
+  background: rgba(16, 185, 129, 0.05);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.match-card-purple {
+  background: rgba(139, 92, 246, 0.05);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.match-card-orange {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.match-card-pink {
+  background: rgba(236, 72, 153, 0.05);
+  border-color: rgba(236, 72, 153, 0.2);
+}
+
+.match-card-cyan {
+  background: rgba(6, 182, 212, 0.05);
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+/* Clean Professional Match Card */
+.match-card-enhanced {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.3s ease;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.match-card-enhanced:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+/* Clean Wrestler Avatar */
+.wrestler-avatar-themed {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.wrestler-avatar-themed:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* Clean Wrestler Name */
+.wrestler-name-themed {
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.wrestler-name-themed:hover {
+  color: var(--primary-light);
+}
+
+/* Clean Betting Buttons */
+.btn-wrestler-themed {
+  background: var(--primary-color);
+  color: #fff;
+  font-weight: 600;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-wrestler-themed:hover {
+  background: var(--primary-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-wrestler-themed:active {
+  transform: translateY(0);
+}
+
+/* Clean Sentiment Bar */
+.sentiment-bar-themed {
+  position: relative;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.sentiment-bar-fill-themed {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.5s ease;
+  background: var(--primary-color);
+}
+
+/* Clean Match Header */
+.match-header-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.match-title-enhanced {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.match-meta-enhanced {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.match-date-enhanced {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.match-event-enhanced {
+  color: #F59E0B;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Clean Weight Class Badge */
+.weight-class-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Clean VS Section */
+.vs-section-enhanced {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.vs-text-enhanced {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Clean Live Indicator */
+.live-indicator-enhanced {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #10B981;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.live-dot-enhanced {
+  width: 6px;
+  height: 6px;
+  background: #10B981;
+  border-radius: 50%;
+  animation: pulse-simple 2s infinite;
+}
+
+@keyframes pulse-simple {
+  0%, 100% { 
+    opacity: 1; 
+  }
+  50% { 
+    opacity: 0.5; 
+  }
+}
+
+/* Simplified animations */
+@keyframes fadeInUp-simple {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInUp-simple {
+  animation: fadeInUp-simple 0.6s ease-out;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .match-card-enhanced {
+    padding: 20px;
+    border-radius: 12px;
+  }
+  
+  .wrestler-avatar-themed {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+  
+  .btn-wrestler-themed {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+  
+  .match-title-enhanced {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .match-card-enhanced {
+    padding: 16px;
+    border-radius: 10px;
+  }
+  
+  .wrestler-avatar-themed {
+    width: 45px;
+    height: 45px;
+    font-size: 1rem;
+  }
+  
+  .btn-wrestler-themed {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+  }
+  
+  .match-title-enhanced {
+    font-size: 1.1rem;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .match-card-enhanced,
+  .wrestler-avatar-themed,
+  .btn-wrestler-themed,
+  .sentiment-bar-fill-themed,
+  .live-dot-enhanced {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .match-card-enhanced {
+    border-width: 2px;
+  }
+  
+  .btn-wrestler-themed {
+    border: 2px solid var(--primary-color);
+  }
+  
+  .wrestler-avatar-themed {
+    border: 2px solid var(--primary-color);
+  }
+}

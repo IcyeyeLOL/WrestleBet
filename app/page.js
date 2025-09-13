@@ -1,5 +1,5 @@
-import FrontPage from './components/FrontPage';
+import FrontPageOptimized from './components/FrontPageOptimized';
 
 export default function Home() {
-  return <FrontPage />;
+  return <FrontPageOptimized />;
 }

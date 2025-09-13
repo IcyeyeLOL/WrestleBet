@@ -26,50 +26,51 @@ const AdminSettings = () => {
     loadSettings();
   }, []);
 
-  const loadSettings = async () => {
+  const loadSettings = () => {
     setLoading(true);
-    try {
-      const response = await fetch('/api/admin/settings', {
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
-      const data = await response.json();
+    fetch('/api/admin/settings', {
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         setSettings(data.settings);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to load settings:', error);
-    } finally {
+    })
+    .finally(() => {
       setLoading(false);
-    }
+    });
   };
 
-  const saveSettings = async () => {
+  const saveSettings = () => {
     setSaving(true);
-    try {
-      // Prepare settings array for update
-      const settingsToUpdate = [];
-      Object.entries(settings).forEach(([category, categorySettings]) => {
-        categorySettings.forEach(setting => {
-          settingsToUpdate.push({
-            setting_key: setting.setting_key,
-            setting_value: setting.setting_value,
-            description: setting.description,
-            category: setting.category
-          });
+    // Prepare settings array for update
+    const settingsToUpdate = [];
+    Object.entries(settings).forEach(([category, categorySettings]) => {
+      categorySettings.forEach(setting => {
+        settingsToUpdate.push({
+          setting_key: setting.setting_key,
+          setting_value: setting.setting_value,
+          description: setting.description,
+          category: setting.category
         });
       });
+    });
 
-      const response = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-        body: JSON.stringify({
-          settings: settingsToUpdate,
-          adminUserId: 'admin-user-id' // This should come from auth context
-        })
-      });
-
-      const data = await response.json();
+    fetch('/api/admin/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      body: JSON.stringify({
+        settings: settingsToUpdate,
+        adminUserId: 'admin-user-id' // This should come from auth context
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         alert('Settings saved successfully!');
         if (data.errors && data.errors.length > 0) {
@@ -78,32 +79,33 @@ const AdminSettings = () => {
       } else {
         alert(`Error saving settings: ${data.error}`);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to save settings:', error);
       alert('Failed to save settings');
-    } finally {
+    })
+    .finally(() => {
       setSaving(false);
-    }
+    });
   };
 
-  const createNewSetting = async () => {
+  const createNewSetting = () => {
     if (!newSetting.setting_key || !newSetting.setting_value) {
       alert('Setting key and value are required');
       return;
     }
 
-    try {
-      const response = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-        body: JSON.stringify({
-          ...newSetting,
-          adminUserId: 'admin-user-id'
-        })
-      });
-
-      const data = await response.json();
+    fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      body: JSON.stringify({
+        ...newSetting,
+        adminUserId: 'admin-user-id'
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         // Add new setting to local state
         const category = data.setting.category;
@@ -123,24 +125,24 @@ const AdminSettings = () => {
       } else {
         alert(`Error creating setting: ${data.error}`);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to create setting:', error);
       alert('Failed to create setting');
-    }
+    });
   };
 
-  const deleteSetting = async (settingKey) => {
+  const deleteSetting = (settingKey) => {
     if (!confirm(`Are you sure you want to delete the setting "${settingKey}"?`)) {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/admin/settings?settingKey=${settingKey}&adminUserId=admin-user-id`, {
-        method: 'DELETE',
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
-
-      const data = await response.json();
+    fetch(`/api/admin/settings?settingKey=${settingKey}&adminUserId=admin-user-id`, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         // Remove setting from local state
         setSettings(prev => {
@@ -154,10 +156,11 @@ const AdminSettings = () => {
       } else {
         alert(`Error deleting setting: ${data.error}`);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to delete setting:', error);
       alert('Failed to delete setting');
-    }
+    });
   };
 
   const updateSettingValue = (category, settingKey, newValue) => {

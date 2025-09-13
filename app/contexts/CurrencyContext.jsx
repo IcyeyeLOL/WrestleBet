@@ -67,6 +67,89 @@ export const CurrencyProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Sync transactions from database (for betting payouts)
+  const syncTransactionsFromDatabase = useCallback((userId) => {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !userId) return;
+    
+    return new Promise((resolve, reject) => {
+      try {
+        fetch(`/api/transactions?userId=${userId}`)
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error('Failed to fetch transactions');
+          })
+          .then(data => {
+            if (data.success && data.transactions) {
+              console.log('💰 Syncing transactions from database:', data.transactions.length);
+              
+              // Get current local transactions
+              const localTxIds = new Set(transactions.map(tx => tx.id));
+              
+              // Find new transactions from database
+              const newTransactions = data.transactions.filter(dbTx => 
+                !localTxIds.has(dbTx.id) && dbTx.type === 'bet_win'
+              );
+              
+              if (newTransactions.length > 0) {
+                console.log(`✅ Found ${newTransactions.length} new payout transactions`);
+                
+                // Add new transactions and update balance
+                let totalPayout = 0;
+                const formattedTx = newTransactions.map(dbTx => {
+                  totalPayout += parseFloat(dbTx.amount || 0);
+                  return {
+                    id: dbTx.id,
+                    type: 'credit',
+                    amount: parseFloat(dbTx.amount || 0),
+                    description: dbTx.description || 'Betting payout',
+                    timestamp: dbTx.created_at,
+                    source: 'database'
+                  };
+                });
+                
+                // Update balance with precision
+                if (totalPayout > 0) {
+                  setBalance(prevBalance => {
+                    const newBalance = updateBalanceWithPrecision(prevBalance, totalPayout);
+                    localStorage.setItem('wrestlecoins_balance', newBalance.toString());
+                    return newBalance;
+                  });
+                }
+                
+                // Add transactions
+                setTransactions(prev => {
+                  const updated = [...prev, ...formattedTx];
+                  localStorage.setItem('wrestlecoins_transactions', JSON.stringify(updated));
+                  
+                  // Update global sync
+                  const globalData = globalDataSync.getData('currency');
+                  globalDataSync.updateData('currency', {
+                    ...globalData,
+                    transactions: updated
+                  });
+                  
+                  return updated;
+                });
+              }
+              
+              resolve(data.transactions);
+            } else {
+              resolve([]);
+            }
+          })
+          .catch(error => {
+            console.error('Error syncing transactions from database:', error);
+            reject(error);
+          });
+      } catch (error) {
+        console.error('Error in syncTransactionsFromDatabase:', error);
+        reject(error);
+      }
+    });
+  }, [transactions]);
+
   // Enhanced balance addition with precision
   const addToBalance = useCallback((amount, description = 'Balance credit') => {
     const preciseAmount = preciseCurrencyCalculation(amount);

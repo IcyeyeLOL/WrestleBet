@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabase';
+import { supabaseAdmin } from '../../../../lib/supabase-admin';
 // Dynamic export configuration for Next.js
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -8,21 +9,30 @@ export const revalidate = 0;
 
 // If Supabase is not configured, return demo data so the admin panel works locally
 const supabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const adminConfigured = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 const demoMatches = [];
 
 // GET - Fetch all matches for admin management
 export async function GET(request) {
   try {
-    if (!supabaseConfigured) {
-      return NextResponse.json({ success: true, matches: demoMatches, total: demoMatches.length });
-    }
+    // Use the same logic as the regular matches API for consistency
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
+    const status = searchParams.get('status') || 'all';
     const limit = searchParams.get('limit') || '50';
 
-    let query = supabase
+    // Use admin client if available, otherwise fall back to regular client
+    const dbClient = supabaseAdmin || supabase;
+
+    let query = dbClient
       .from('matches')
-      .select('*')
+      .select(`
+        *,
+        wrestler1_pool,
+        wrestler2_pool,
+        total_pool,
+        odds_wrestler1,
+        odds_wrestler2
+      `)
       .order('created_at', { ascending: false })
       .limit(parseInt(limit));
 
@@ -34,27 +44,26 @@ export async function GET(request) {
 
     if (error) {
       console.error('Error fetching matches:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      // If database error, return empty matches array instead of failing
+      console.log('⚠️ Database not accessible, returning empty matches array');
+      return NextResponse.json({ 
+        success: true, 
+        matches: [], 
+        total: 0,
+        warning: 'Database not accessible - using demo mode'
+      });
     }
 
-    // Get betting data for each match
-    const matchesWithStats = await Promise.all(matches.map(async (match) => {
-      const { data: bets } = await supabase
-        .from('bets')
-        .select('*')
-        .eq('match_id', match.id);
-
-      const { data: votes } = await supabase
-        .from('votes')
-        .select('*')
-        .eq('match_id', match.id);
-
-      return {
-        ...match,
-        totalBets: bets?.length || 0,
-        totalVotes: votes?.length || 0,
-        totalPool: bets?.reduce((sum, bet) => sum + bet.amount, 0) || 0
-      };
+    // Process matches with aggregated data
+    const matchesWithStats = matches.map(match => ({
+      ...match,
+      totalBets: 0, // Will be calculated separately if needed
+      totalVotes: 0, // Will be calculated separately if needed
+      totalPool: match.total_pool || match.total_bet_pool || 0,
+      wrestler1_pool: match.wrestler1_pool || 0,
+      wrestler2_pool: match.wrestler2_pool || 0,
+      odds_wrestler1: match.odds_wrestler1 || 2.0,
+      odds_wrestler2: match.odds_wrestler2 || 2.0
     }));
 
     return NextResponse.json({
@@ -65,15 +74,14 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Admin matches fetch error:', error);
-    // Always provide demo data on failure so the admin UI remains usable
-    return NextResponse.json({ success: true, matches: demoMatches, total: demoMatches.length });
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // POST - Create new match
 export async function POST(request) {
   try {
-    if (!supabaseConfigured) {
+    if (!supabaseConfigured || !adminConfigured) {
       return NextResponse.json({ success: false, error: 'Demo mode: Backend not configured. Creating match locally.' }, { status: 503 });
     }
     const body = await request.json();
@@ -95,8 +103,8 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Use regular supabase client (admin functionality through database policies)
-    const dbClient = supabase;
+    // Use admin client to bypass RLS for match creation
+    const dbClient = supabaseAdmin || supabase;
 
     // Insert new match
     const { data: match, error } = await dbClient
@@ -108,9 +116,14 @@ export async function POST(request) {
         weight_class: weightClass,
         match_date: matchDate ? new Date(matchDate).toISOString() : null,
         description,
-        created_by_admin: adminUserId,
         status: 'upcoming',
-        total_bet_pool: 0
+        wrestler1_pool: 0,
+        wrestler2_pool: 0,
+        total_pool: 0,
+        wrestler1_percentage: 50,
+        wrestler2_percentage: 50,
+        odds_wrestler1: 2.0,
+        odds_wrestler2: 2.0
       })
       .select()
       .single();
@@ -137,7 +150,7 @@ export async function POST(request) {
 // PUT - Update existing match
 export async function PUT(request) {
   try {
-    if (!supabaseConfigured) {
+    if (!supabaseConfigured || !adminConfigured) {
       return NextResponse.json({ success: false, error: 'Backend not configured (Supabase). Configure env to update matches.' }, { status: 503 });
     }
     const body = await request.json();
@@ -205,7 +218,7 @@ export async function DELETE(request) {
     const adminUserId = searchParams.get('adminUserId');
     const force = searchParams.get('force') === 'true';
 
-    if (!supabaseConfigured) {
+    if (!supabaseConfigured || !adminConfigured) {
       return NextResponse.json({ success: false, error: 'Backend not configured (Supabase). Configure env to delete matches.' }, { status: 503 });
     }
 
@@ -218,19 +231,24 @@ export async function DELETE(request) {
 
     console.log(`🗑️ Admin attempting to delete match ${id}${force ? ' (FORCE DELETE)' : ''}`);
 
-    // Use regular supabase client (RLS policies should be permissive enough)
-    const dbClient = supabase;
+    // Use admin client to bypass RLS
+    const dbClient = supabaseAdmin || supabase;
 
-    // First, get the match to check if it exists and log details
+    // First, check if match exists (use .maybeSingle() to avoid error if not found)
     const { data: matchToDelete, error: fetchError } = await dbClient
       .from('matches')
-      .select('*')
-      .eq('id', id)
-      .single();
+      .select('id, wrestler1, wrestler2, status')
+      .eq('id', id.toString())
+      .maybeSingle();
 
     if (fetchError) {
       console.error('Error fetching match to delete:', fetchError);
-      return NextResponse.json({ success: false, error: `Match not found: ${fetchError.message}` }, { status: 404 });
+      return NextResponse.json({ success: false, error: `Database error: ${fetchError.message}` }, { status: 500 });
+    }
+
+    if (!matchToDelete) {
+      console.log(`❌ Match ${id} not found`);
+      return NextResponse.json({ success: false, error: 'Match not found' }, { status: 404 });
     }
 
     console.log(`📊 Match details: ${matchToDelete.wrestler1} vs ${matchToDelete.wrestler2}`);
@@ -266,7 +284,7 @@ export async function DELETE(request) {
       const { error: betsDeleteError } = await dbClient
         .from('bets')
         .delete()
-        .eq('match_id', id);
+        .eq('match_id', id.toString());
 
       if (betsDeleteError) {
         console.error('Error force deleting bets:', betsDeleteError);
@@ -283,7 +301,7 @@ export async function DELETE(request) {
     const { error: votesDeleteError } = await dbClient
       .from('votes')
       .delete()
-      .eq('match_id', id);
+      .eq('match_id', id.toString());
 
     if (votesDeleteError) {
       console.error('Error deleting related votes:', votesDeleteError);
@@ -296,7 +314,7 @@ export async function DELETE(request) {
     const { error: deleteError } = await dbClient
       .from('matches')
       .delete()
-      .eq('id', id);
+      .eq('id', id.toString());
 
     if (deleteError) {
       console.error('Error deleting match:', deleteError);

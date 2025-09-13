@@ -125,7 +125,7 @@ export const BettingProvider = ({ children }) => {
   }, [userBets]);
 
   // Enhanced bet placement with precise calculations
-  const placeBet = useCallback(async (matchId, wrestler, amount, odds) => {
+  const placeBet = useCallback((matchId, wrestler, amount, odds) => {
     const preciseAmount = preciseCurrencyCalculation(amount);
     
     // Get current balance from localStorage

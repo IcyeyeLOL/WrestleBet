@@ -7,8 +7,12 @@ import SharedHeader from './SharedHeader';
 import BettingModal from './BettingModal';
 import PurchaseWCModal from './PurchaseWCModal';
 import AuthModal from './AuthModal';
+import DynamicBettingCard from './DynamicBettingCard';
 import globalStorage from '../lib/globalStorage';
 import { supabase } from '../../lib/supabase';
+import '../styles/front-page.css';
+import '../styles/match-cards.css';
+import '../styles/simplified.css';
 
 const FrontPage = () => {
   const { 
@@ -59,10 +63,43 @@ const FrontPage = () => {
   // Real-time sync status
   const [syncStatus, setSyncStatus] = useState('connecting');
 
+  // Handle bet placement from dynamic betting card
+  const handleDynamicBetPlaced = (betResult) => {
+    console.log('🎯 Dynamic bet placed:', betResult);
+    
+    // Update user balance if provided
+    if (betResult.newBalance !== undefined) {
+      // Update currency context
+      if (subtractFromBalance) {
+        subtractFromBalance(betResult.betAmount);
+      }
+    }
+    
+    // Show success notification
+    setBettingModal({
+      isOpen: false,
+      matchId: '',
+      wrestler: '',
+      odds: ''
+    });
+    
+    // Reload matches to get updated data
+    loadDynamicMatches();
+  };
+
   // Load dynamic matches from database with real-time sync
   useEffect(() => {
-    loadDynamicMatches();
-    setupRealTimeSync();
+    const loadData = async () => {
+      try {
+        await loadDynamicMatches();
+        setupRealTimeSync();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setMatchesLoading(false);
+      }
+    };
+    
+    loadData();
     
     // Add timeout to prevent infinite loading
     const timeout = setTimeout(() => {
@@ -77,33 +114,48 @@ const FrontPage = () => {
 
   // Load matches from database with real-time updates
   useEffect(() => {
-    loadDynamicMatches();
-    
-    // Set up real-time subscription for match updates
-    const matchSubscription = supabase
-      .channel('match_updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'matches'
-      }, (payload) => {
-        console.log('🔄 Real-time match update:', payload);
-        // Reload matches when any match is updated
-        loadDynamicMatches();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public', 
-        table: 'bets'
-      }, (payload) => {
-        console.log('💰 Real-time bet update:', payload);
-        // Reload matches when bets change to update pools/odds
-        setTimeout(() => loadDynamicMatches(), 500); // Small delay for database trigger
-      })
-      .subscribe();
+    const setupRealTimeUpdates = async () => {
+      try {
+        await loadDynamicMatches();
+      } catch (error) {
+        console.error('Error in setupRealTimeUpdates:', error);
+      }
+      
+      // Set up real-time subscription for match updates
+      const matchSubscription = supabase
+        .channel('match_updates')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'matches'
+        }, (payload) => {
+          console.log('🔄 Real-time match update:', payload);
+          // Reload matches when any match is updated
+          loadDynamicMatches();
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public', 
+          table: 'bets'
+        }, (payload) => {
+          console.log('💰 Real-time bet update:', payload);
+          // Reload matches when bets change to update pools/odds
+          setTimeout(async () => await loadDynamicMatches(), 500); // Small delay for database trigger
+        })
+        .subscribe();
+
+      return matchSubscription;
+    };
+
+    let matchSubscription;
+    setupRealTimeUpdates().then(subscription => {
+      matchSubscription = subscription;
+    });
 
     return () => {
-      supabase.removeChannel(matchSubscription);
+      if (matchSubscription) {
+        supabase.removeChannel(matchSubscription);
+      }
     };
   }, []);
 
@@ -111,7 +163,16 @@ const FrontPage = () => {
   useEffect(() => {
     const handleAdminMatchUpdate = () => {
       console.log('📢 Admin match event received on FrontPage - refreshing matches...');
-      setTimeout(() => loadDynamicMatches(), 200);
+      setTimeout(() => {
+        const refreshData = async () => {
+          try {
+            await loadDynamicMatches();
+          } catch (error) {
+            console.error('Error refreshing matches:', error);
+          }
+        };
+        refreshData();
+      }, 200);
     };
 
     window.addEventListener('admin-match-created', handleAdminMatchUpdate);
@@ -123,39 +184,104 @@ const FrontPage = () => {
     };
   }, []);
 
+  // Generate consistent colors for wrestlers with guaranteed different colors per match
+  const getWrestlerTheme = (wrestlerName, matchId, wrestlerPosition) => {
+    const themes = [
+      'wrestler-theme-blue',
+      'wrestler-theme-red', 
+      'wrestler-theme-green',
+      'wrestler-theme-purple',
+      'wrestler-theme-orange',
+      'wrestler-theme-pink',
+      'wrestler-theme-cyan',
+      'wrestler-theme-indigo'
+    ];
+    
+    // Create a hash from wrestler name and match ID for consistency
+    const hash = wrestlerName.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, matchId.length);
+    
+    // Use wrestler position to ensure different colors within same match
+    const baseIndex = Math.abs(hash) % themes.length;
+    const positionOffset = wrestlerPosition === 'wrestler1' ? 0 : 1;
+    const finalIndex = (baseIndex + positionOffset) % themes.length;
+    
+    return themes[finalIndex];
+  };
+
+  // Generate match card theme for variety
+  const getMatchCardTheme = (matchId) => {
+    const cardThemes = [
+      'match-card-blue',
+      'match-card-green', 
+      'match-card-purple',
+      'match-card-orange',
+      'match-card-pink',
+      'match-card-cyan'
+    ];
+    
+    const hash = matchId.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    
+    return cardThemes[Math.abs(hash) % cardThemes.length];
+  };
+
+  const getWrestlerInitials = (name) => {
+    return name.split(' ').map(word => word.charAt(0)).join('').toUpperCase();
+  };
+
   // Load matches from database (fully dynamic - no hardcoded data)
   const loadDynamicMatches = async () => {
     try {
       setMatchesLoading(true);
-      console.log('🔄 Loading dynamic matches from database...');
+      console.log('🔄 Loading dynamic matches from admin API...');
       
-      // Use simplified query approach
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .in('status', ['active', 'upcoming'])
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ Supabase error:', error);
+      // Use admin API endpoint to get matches (bypasses RLS)
+      const response = await fetch('/api/admin/matches');
+      const result = await response.json();
+      
+      console.log('📡 API Response:', {
+        success: result.success,
+        matchesCount: result.matches?.length || 0,
+        warning: result.warning || 'No warnings',
+        error: result.error || 'No errors'
+      });
+      
+      if (!result.success) {
+        console.error('❌ Admin API error:', result.error);
         setDynamicMatches([]);
         return;
       }
       
-      const matches = data || [];
-      console.log(`📊 Raw matches from database (${matches.length} total):`, matches);
+      const matches = result.matches || [];
+      console.log(`📊 Raw matches from admin API (${matches.length} total):`, matches);
 
-      // CRITICAL: Filter out any potential hardcoded matches
+      // Filter for active and upcoming matches only
       const validMatches = matches.filter(match => {
-        // Only allow matches that have valid database IDs and were created through admin
-        const hasValidId = match.id && match.id.length > 10; // UUIDs are longer than 10 chars
+        const hasValidId = match.id && match.id.length > 0;
         const hasValidWrestlers = match.wrestler1 && match.wrestler2;
-        const isNotHardcoded = !isHardcodedMatch(match);
+        const isActiveOrUpcoming = ['active', 'upcoming'].includes(match.status);
         
-        if (!hasValidId || !hasValidWrestlers || !isNotHardcoded) {
-          console.log('🚫 Filtering out potentially hardcoded match:', match);
+        if (!hasValidId || !hasValidWrestlers) {
+          console.log('🚫 Filtering out invalid match (missing data):', match);
           return false;
         }
+        
+        if (!isActiveOrUpcoming) {
+          console.log('🚫 Filtering out non-active/upcoming match:', match.status, match);
+          return false;
+        }
+        
+        console.log('✅ Valid match found:', {
+          id: match.id,
+          wrestlers: `${match.wrestler1} vs ${match.wrestler2}`,
+          status: match.status,
+          created_at: match.created_at
+        });
         
         return true;
       });
@@ -177,9 +303,13 @@ const FrontPage = () => {
             // Return match with database values as fallback
             return {
               ...match,
+              wrestler1_pool: match.wrestler1_pool || 0,
+              wrestler2_pool: match.wrestler2_pool || 0,
               total_pool: match.total_pool || 0,
-              odds_wrestler1: match.odds_wrestler1 || 1.10,
-              odds_wrestler2: match.odds_wrestler2 || 1.10,
+              odds_wrestler1: match.odds_wrestler1 || 2.0,
+              odds_wrestler2: match.odds_wrestler2 || 2.0,
+              wrestler1_percentage: match.wrestler1_percentage || 50,
+              wrestler2_percentage: match.wrestler2_percentage || 50,
               enriched: false,
               error: `Database error: ${betsError.message}`
             };
@@ -219,9 +349,16 @@ const FrontPage = () => {
 
           const enrichedMatch = {
             ...match,
-            total_pool: totalPool || match.total_pool || 0,
+            // Update pool data with calculated values
+            wrestler1_pool: wrestler1Pool,
+            wrestler2_pool: wrestler2Pool,
+            total_pool: totalPool,
+            // Update odds with calculated values
             odds_wrestler1: parseFloat(odds1.toFixed(1)),
             odds_wrestler2: parseFloat(odds2.toFixed(1)),
+            // Calculate percentages
+            wrestler1_percentage: totalPool > 0 ? Math.round((wrestler1Pool / totalPool) * 100) : 50,
+            wrestler2_percentage: totalPool > 0 ? Math.round((wrestler2Pool / totalPool) * 100) : 50,
             enriched: true,
             bets_count: bets?.length || 0
           };
@@ -247,24 +384,25 @@ const FrontPage = () => {
         }
       }));
       
+      console.log('🎯 About to set dynamicMatches state with', enrichedMatches.length, 'matches');
       setDynamicMatches(enrichedMatches);
       
       if (enrichedMatches.length === 0) {
         console.log('📋 No valid matches found - create matches using admin panel');
         console.log('🔗 Admin panel: /admin');
       } else {
-        console.log('✅ Loaded valid dynamic matches from database:', enrichedMatches.length, 'matches');
-        console.log('📊 Match data with pools:', enrichedMatches.map(m => ({
+        console.log('✅ Successfully loaded', enrichedMatches.length, 'dynamic matches from database');
+        console.log('📊 Match summary:', enrichedMatches.map(m => ({
           id: m.id,
           wrestlers: `${m.wrestler1} vs ${m.wrestler2}`,
+          status: m.status,
           pool: m.total_pool,
           odds: `${m.odds_wrestler1} / ${m.odds_wrestler2}`,
-          enriched: m.enriched
+          enriched: m.enriched,
+          created: m.created_at
         })));
+        console.log('🎯 Matches should now appear on frontend!');
       }
-      
-      console.log('🎯 Setting dynamicMatches state - this should trigger UI re-render');
-      setDynamicMatches(enrichedMatches);
       
     } catch (error) {
       console.error('❌ Error loading dynamic matches:', error);
@@ -272,22 +410,6 @@ const FrontPage = () => {
     } finally {
       setMatchesLoading(false);
     }
-  };
-
-  // Function to detect hardcoded matches
-  const isHardcodedMatch = (match) => {
-    const hardcodedNames = [
-      'sarah wilson', 'emma davis', 'alex thompson', 'chris brown',
-      'david taylor', 'hassan yazdani', 'kyle dake', 'bajrang punia',
-      'gable steveson', 'geno petriashvili'
-    ];
-    
-    const wrestler1Lower = (match.wrestler1 || '').toLowerCase();
-    const wrestler2Lower = (match.wrestler2 || '').toLowerCase();
-    
-    return hardcodedNames.some(name => 
-      wrestler1Lower.includes(name) || wrestler2Lower.includes(name)
-    );
   };
 
   // Setup real-time sync for global updates
@@ -491,13 +613,27 @@ const FrontPage = () => {
       console.log('🔄 Forcing match data refresh after bet...');
       setTimeout(() => {
         console.log('🔄 Executing delayed match refresh...');
-        loadDynamicMatches();
+        const refreshData = async () => {
+          try {
+            await loadDynamicMatches();
+          } catch (error) {
+            console.error('Error refreshing matches:', error);
+          }
+        };
+        refreshData();
       }, 1000); // 1 second delay
       
       // Also trigger immediate refresh for real-time feel
       setTimeout(() => {
         console.log('🔄 Executing immediate match refresh...');
-        loadDynamicMatches();
+        const refreshData = async () => {
+          try {
+            await loadDynamicMatches();
+          } catch (error) {
+            console.error('Error refreshing matches:', error);
+          }
+        };
+        refreshData();
       }, 100); // 100ms delay
       
       const displayName = getWrestlerDisplayName(wrestler, matchId);
@@ -511,7 +647,7 @@ const FrontPage = () => {
       alert(`❌ Bet Failed!\n\nError: ${error.message}\nYour balance has been refunded.`);
       
       // Force refresh anyway to ensure UI is consistent
-      setTimeout(() => loadDynamicMatches(), 500);
+      setTimeout(async () => await loadDynamicMatches(), 500);
     }
   };
 
@@ -523,10 +659,24 @@ const FrontPage = () => {
     const match = dynamicMatches.find(m => m.id === matchId);
     if (!match) {
       console.log(`⚠️ Match not found for ${matchId}, returning 50%`);
+      console.log(`Available matches:`, dynamicMatches.map(m => ({ id: m.id, wrestler1: m.wrestler1, wrestler2: m.wrestler2 })));
       return 50;
     }
 
-    // Get actual wrestler pools from database (NEW COLUMNS)
+    // First try to use database percentages if they exist and are valid
+    if (wrestlerPosition === 'wrestler1' && match.wrestler1_percentage && match.wrestler1_percentage > 0) {
+      const dbPercentage = parseInt(match.wrestler1_percentage);
+      console.log(`✅ Using database percentage for ${wrestlerPosition}: ${dbPercentage}%`);
+      return dbPercentage;
+    }
+    
+    if (wrestlerPosition === 'wrestler2' && match.wrestler2_percentage && match.wrestler2_percentage > 0) {
+      const dbPercentage = parseInt(match.wrestler2_percentage);
+      console.log(`✅ Using database percentage for ${wrestlerPosition}: ${dbPercentage}%`);
+      return dbPercentage;
+    }
+
+    // Fallback: Calculate from pools
     const wrestler1Pool = parseFloat(match.wrestler1_pool) || 0;
     const wrestler2Pool = parseFloat(match.wrestler2_pool) || 0;
     const totalPool = wrestler1Pool + wrestler2Pool;
@@ -536,8 +686,10 @@ const FrontPage = () => {
       wrestler2_pool: wrestler2Pool,
       total_pool: totalPool,
       database_total_pool: match.total_pool,
-      odds_wrestler1: match.odds_wrestler1,
-      odds_wrestler2: match.odds_wrestler2
+      wrestler1_percentage: match.wrestler1_percentage,
+      wrestler2_percentage: match.wrestler2_percentage,
+      match_status: match.status,
+      full_match_data: match
     });
 
     // If no bets placed yet, return 50/50
@@ -581,7 +733,21 @@ const FrontPage = () => {
     if (!match) {
       return 0;
     }
-    return match.total_pool || 0;
+    
+    // Use database total_pool if available, otherwise calculate from individual pools
+    const dbTotalPool = parseFloat(match.total_pool) || 0;
+    const calculatedTotalPool = (parseFloat(match.wrestler1_pool) || 0) + (parseFloat(match.wrestler2_pool) || 0);
+    
+    // Use the higher value (database should be more accurate)
+    const totalPool = Math.max(dbTotalPool, calculatedTotalPool);
+    
+    console.log(`💰 Total WC in pool for ${matchId}:`, {
+      db_total_pool: dbTotalPool,
+      calculated_total_pool: calculatedTotalPool,
+      final_total_pool: totalPool
+    });
+    
+    return totalPool;
   };
 
   const hasAlreadyBet = (matchId) => {
@@ -633,7 +799,20 @@ const FrontPage = () => {
       return '2.00';
     }
 
-    // Get actual wrestler pools from database (same as percentage calculation)
+    // First try to use database odds if they exist and are valid
+    if (wrestler === 'wrestler1' && match.odds_wrestler1 && match.odds_wrestler1 > 0) {
+      const dbOdds = parseFloat(match.odds_wrestler1).toFixed(1);
+      console.log(`✅ Using database odds for ${wrestler}: ${dbOdds}`);
+      return dbOdds;
+    }
+    
+    if (wrestler === 'wrestler2' && match.odds_wrestler2 && match.odds_wrestler2 > 0) {
+      const dbOdds = parseFloat(match.odds_wrestler2).toFixed(1);
+      console.log(`✅ Using database odds for ${wrestler}: ${dbOdds}`);
+      return dbOdds;
+    }
+
+    // Fallback: Calculate from pools
     const wrestler1Pool = parseFloat(match.wrestler1_pool) || 0;
     const wrestler2Pool = parseFloat(match.wrestler2_pool) || 0;
     const totalPool = wrestler1Pool + wrestler2Pool;
@@ -641,7 +820,9 @@ const FrontPage = () => {
     console.log(`💰 Odds pool data for ${matchId}:`, {
       wrestler1_pool: wrestler1Pool,
       wrestler2_pool: wrestler2Pool,
-      total_pool: totalPool
+      total_pool: totalPool,
+      db_odds1: match.odds_wrestler1,
+      db_odds2: match.odds_wrestler2
     });
 
     // If no bets placed yet, return even odds
@@ -704,7 +885,7 @@ const FrontPage = () => {
   }
 
   return (
-    <div className="font-inter overflow-x-hidden text-white">
+    <div className="font-inter overflow-x-hidden text-white bg-gradient-wrestlebet min-h-screen">
       <SharedHeader 
         onTogglePurchaseModal={() => setShowPurchaseModal(!showPurchaseModal)}
         showPurchaseModal={showPurchaseModal}
@@ -718,87 +899,125 @@ const FrontPage = () => {
       )}
 
       {/* Hero Section */}
-      <section className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center">
-        <div className="text-center max-w-4xl mx-auto px-4">
-          <h1 className="text-4xl md:text-6xl lg:text-8xl font-black mb-6 text-yellow-400">
-                Elite Wrestling
-                <br />
-            <span className="text-3xl md:text-5xl lg:text-7xl text-white">Betting Experience</span>
+      <section className="hero-gradient hero-radial grid-pattern min-h-screen flex items-center justify-center relative">
+        <div className="text-center max-w-6xl mx-auto px-4 relative z-10">
+          <div className="animate-fadeInUp">
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <div className="animate-floating">
+                <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="text-2xl font-black text-black">🤼</span>
+                </div>
+              </div>
+              <h1 className="hero-title text-5xl md:text-7xl lg:text-8xl">
+                WrestleBet
               </h1>
-          <p className="text-lg md:text-xl mb-8 text-slate-300">
-            Join the ultimate destination for freestyle wrestling betting
-          </p>
+            </div>
+            
+            <p className="hero-subtitle mb-8 max-w-3xl mx-auto text-lg md:text-xl">
+              Bet on your favorite wrestlers with <span className="text-yellow-400 font-bold">WrestleCoins</span> and 
+              watch <span className="text-green-400 font-bold">real-time odds</span> shift with every bet placed by the community!
+            </p>
+            
+            <div className="flex flex-wrap justify-center items-center gap-6 text-slate-300 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                <span>Live Odds</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+                <span>Real-time Updates</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
+                <span>Community Driven</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Matches Section */}
-      <section className="py-12 bg-slate-900">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl md:text-5xl font-black mb-4 text-yellow-400">
-                  Hot Matches This Week
-              </h2>
-            </div>
+      <section className="py-20 px-4" style={{backgroundColor: '#3a3a5c'}}>
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-center text-4xl md:text-5xl font-bold mb-16 text-yellow-400">
+            Hot Matches This Week
+          </h2>
             
                      {/* Dynamic Match Cards */}
            <div className="space-y-4">
              {dynamicMatches.length === 0 ? (
-               <div className="text-center py-12">
-                 <div className="bg-slate-800/50 backdrop-blur-md rounded-3xl p-8 border border-slate-600/30">
-                   <div className="text-6xl mb-4">🏆</div>
+               <div className="text-center py-16">
+                 <div className="max-w-md mx-auto p-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl shadow-xl">
+                   <div className="text-6xl mb-6">🏆</div>
                    <h3 className="text-2xl font-bold text-yellow-400 mb-4">No Matches Available</h3>
-                   <p className="text-slate-300 mb-6">
+                   <p className="text-gray-300 mb-4">
                      No upcoming matches have been created yet. Check back soon for new wrestling events!
                    </p>
-                   <div className="text-sm text-slate-400">
+                   <p className="text-sm text-gray-400">
                      Admins can create new matches through the admin panel.
-                   </div>
+                   </p>
                  </div>
                </div>
              ) : (
                dynamicMatches.map((match) => {
-              const getInitials = (name) => {
-                return name.split(' ').map(word => word.charAt(0)).join('').toUpperCase();
-              };
               
                              // Use position-based keys to avoid conflicts when wrestlers have same name
                const wrestler1Key = 'wrestler1';
                const wrestler2Key = 'wrestler2';
               
               return (
-                <div key={match.id} className="bg-slate-800 rounded-2xl p-4 border border-slate-600/30">
-                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4">
-                    <div className="flex-1 mb-4 lg:mb-0">
-                      <div className="flex items-center justify-center lg:justify-start gap-4 p-3">
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center text-white font-black text-sm mb-2">
-                            {getInitials(match.wrestler1)}
-                          </div>
-                          <span className="text-slate-300 font-semibold text-sm">{match.wrestler1}</span>
+                <div key={match.id}>
+                  {/* Dynamic Betting Card */}
+                  <DynamicBettingCard 
+                    match={match} 
+                    onBetPlaced={handleDynamicBetPlaced}
+                  />
+                  
+                  {/* Legacy Match Card (for comparison) */}
+                  <div className={`match-card-enhanced mb-8 ${getMatchCardTheme(match.id)}`}>
+                    {/* Match Header */}
+                    <div className="match-header-enhanced">
+                      <h3 className="match-title-enhanced">
+                        {match.wrestler1} vs {match.wrestler2}
+                      </h3>
+                      <div className="match-meta-enhanced">
+                        <div className="match-date-enhanced">
+                          {match.match_date ? new Date(match.match_date).toLocaleDateString() : 'TBD'}
                         </div>
-                        
-                        <div className="flex flex-col items-center">
-                          <span className="text-yellow-400 text-xs font-bold px-3 py-1 bg-yellow-400/20 rounded-full mb-1">{match.weight_class}</span>
-                          <span className="text-slate-400 font-bold text-sm">VS</span>
+                        <div className="match-event-enhanced">
+                          {match.event_name}
                         </div>
-                        
-                        <div className="text-center">
-                          <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center text-white font-black text-sm mb-2">
-                            {getInitials(match.wrestler2)}
-                          </div>
-                          <span className="text-slate-300 font-semibold text-sm">{match.wrestler2}</span>
                       </div>
                     </div>
+
+                  {/* Wrestlers Section */}
+                  <div className="flex flex-col lg:flex-row justify-between items-center gap-8 mb-8">
+                    {/* Wrestler 1 */}
+                    <div className={`flex flex-col items-center ${getWrestlerTheme(match.wrestler1, match.id, 'wrestler1')}`}>
+                      <div className="wrestler-avatar-themed mb-4">
+                        {getWrestlerInitials(match.wrestler1)}
+                      </div>
+                      <span className="wrestler-name-themed text-center">
+                        {match.wrestler1}
+                      </span>
+                    </div>
                     
-                      <div className="flex flex-wrap items-center gap-3 mt-3 text-slate-400 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
-                          <span>{match.match_date ? new Date(match.match_date).toLocaleDateString() : 'TBD'}</span>
+                    {/* VS Section */}
+                    <div className="vs-section-enhanced">
+                      <div className="weight-class-badge">
+                        {match.weight_class}
                       </div>
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                          <span>{match.event_name}</span>
+                      <div className="vs-text-enhanced">VS</div>
+                    </div>
+                    
+                    {/* Wrestler 2 */}
+                    <div className={`flex flex-col items-center ${getWrestlerTheme(match.wrestler2, match.id, 'wrestler2')}`}>
+                      <div className="wrestler-avatar-themed mb-4">
+                        {getWrestlerInitials(match.wrestler2)}
                       </div>
+                      <span className="wrestler-name-themed text-center">
+                        {match.wrestler2}
+                      </span>
                     </div>
                   </div>
                   
@@ -827,33 +1046,52 @@ const FrontPage = () => {
                         </div>
                       </div>
                     ) : (
+                        <>
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                         <button 
                             onClick={() => handlePlaceBet(match.id, wrestler1Key, getDynamicOdds(match.id, wrestler1Key))}
-                            className="flex-1 bg-blue-500/20 border border-blue-500/50 text-blue-300 hover:text-white px-4 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-400/25 active:scale-95 touch-manipulation"
+                            className={`btn-wrestler-themed flex-1 ${getWrestlerTheme(match.wrestler1, match.id, 'wrestler1')}`}
                           >
                             <div className="text-center">
                               <div className="text-base sm:text-lg">{match.wrestler1}</div>
-                              <div className="text-xl sm:text-2xl font-black text-yellow-400">{getDynamicOdds(match.id, wrestler1Key)}</div>
+                              <div className="text-xl sm:text-2xl font-black">{getDynamicOdds(match.id, wrestler1Key)}</div>
                           </div>
                         </button>
                         
                         <button 
                             onClick={() => handlePlaceBet(match.id, wrestler2Key, getDynamicOdds(match.id, wrestler2Key))}
-                            className="flex-1 bg-red-500/20 border border-red-500/50 text-red-300 hover:text-white px-4 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-400/25 active:scale-95 touch-manipulation"
+                            className={`btn-wrestler-themed flex-1 ${getWrestlerTheme(match.wrestler2, match.id, 'wrestler2')}`}
                           >
                             <div className="text-center">
                               <div className="text-base sm:text-lg">{match.wrestler2}</div>
-                              <div className="text-xl sm:text-2xl font-black text-yellow-400">{getDynamicOdds(match.id, wrestler2Key)}</div>
+                              <div className="text-xl sm:text-2xl font-black">{getDynamicOdds(match.id, wrestler2Key)}</div>
                           </div>
                         </button>
                       </div>
+                      
+                      {/* Temporary: Sentiment Vote Buttons for Testing */}
+                      <div className="mt-3 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <button 
+                            onClick={() => handleVote(match.id, wrestler1Key)}
+                            className="btn-wrestlebet-secondary flex-1 text-sm"
+                          >
+                            Vote {match.wrestler1} (Test Sentiment)
+                        </button>
+                        
+                        <button 
+                            onClick={() => handleVote(match.id, wrestler2Key)}
+                            className="btn-wrestlebet-secondary flex-1 text-sm"
+                          >
+                            Vote {match.wrestler2} (Test Sentiment)
+                        </button>
+                      </div>
+                      </>
                     )}
                   </div>
                 </div>
                 
-                                     {/* Sentiment Analysis */}
-                   <div className="mt-4 bg-gradient-to-r from-slate-700/80 to-slate-800/80 backdrop-blur-sm border border-slate-600/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl">
+                  {/* Sentiment Analysis */}
+                  <div className="wrestlebet-card mt-6">
                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 sm:gap-0">
                        <span className="text-slate-200 font-bold text-base sm:text-lg">Community Sentiment</span>
                        <div className="flex items-center gap-2 sm:gap-3">
@@ -861,7 +1099,10 @@ const FrontPage = () => {
                            {getTotalWCInPool(match.id).toLocaleString()} WC in pool
                          </span>
                          {animatedMatches.has(match.id) && (
-                           <span className="text-green-300 text-xs font-bold bg-green-400/20 px-2 py-1 rounded-full border border-green-400/30 animate-pulse">🔄 Live</span>
+                           <span className="live-indicator-enhanced">
+                             <span className="live-dot-enhanced"></span>
+                             Live
+                           </span>
                          )}
                        </div>
                      </div>
@@ -872,13 +1113,13 @@ const FrontPage = () => {
                           <span className="text-sm text-slate-300 font-medium">{match.wrestler1}</span>
                           <span className="text-sm text-slate-300 font-medium">{match.wrestler2}</span>
                         </div>
-                        <div className="relative bg-slate-600/50 rounded-full h-3 overflow-hidden border border-slate-500/30 shadow-inner">
+                        <div className="sentiment-bar-themed">
                           <div 
-                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500 ease-out shadow-lg"
+                            className={`sentiment-bar-fill-themed ${getWrestlerTheme(match.wrestler1, match.id, 'wrestler1')}`}
                             style={{ width: `${getPercentage(match.id, wrestler1Key)}%` }}
                           ></div>
                           <div 
-                            className="absolute right-0 top-0 h-full bg-gradient-to-r from-red-500 to-red-400 transition-all duration-500 ease-out shadow-lg"
+                            className={`sentiment-bar-fill-themed ${getWrestlerTheme(match.wrestler2, match.id, 'wrestler2')}`}
                             style={{ width: `${getPercentage(match.id, wrestler2Key)}%` }}
                           ></div>
                           {/* Animated pulse effect when pools are updated */}
@@ -896,19 +1137,19 @@ const FrontPage = () => {
                      
                      {/* Percentage Display */}
                      <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 text-xs sm:text-sm">
-                       <div className="flex items-center gap-2 sm:gap-3 bg-blue-500/10 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl border border-blue-500/20">
-                         <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded-full shadow-lg"></div>
+                       <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl border ${getWrestlerTheme(match.wrestler1, match.id, 'wrestler1')}`} style={{backgroundColor: 'var(--primary-bg)', borderColor: 'var(--primary-border)'}}>
+                         <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow-lg" style={{backgroundColor: 'var(--primary-color)'}}></div>
                          <span className="text-slate-200 font-medium">{match.wrestler1}</span>
-                         <span className="font-bold text-yellow-300 text-base sm:text-lg">{getPercentage(match.id, wrestler1Key)}%</span>
+                         <span className="font-bold text-base sm:text-lg" style={{color: 'var(--primary-light)'}}>{getPercentage(match.id, wrestler1Key)}%</span>
                        </div>
-                       <div className="flex items-center gap-2 sm:gap-3 bg-red-500/10 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl border border-red-500/20">
-                         <span className="font-bold text-yellow-300 text-base sm:text-lg">{getPercentage(match.id, wrestler2Key)}%</span>
+                       <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl border ${getWrestlerTheme(match.wrestler2, match.id, 'wrestler2')}`} style={{backgroundColor: 'var(--primary-bg)', borderColor: 'var(--primary-border)'}}>
+                         <span className="font-bold text-base sm:text-lg" style={{color: 'var(--primary-light)'}}>{getPercentage(match.id, wrestler2Key)}%</span>
                          <span className="text-slate-200 font-medium">{match.wrestler2}</span>
-                         <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded-full shadow-lg"></div>
+                         <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow-lg" style={{backgroundColor: 'var(--primary-color)'}}></div>
                        </div>
                      </div>
                    </div>
-                                 </div>
+                 </div>
                );
              })
              )}

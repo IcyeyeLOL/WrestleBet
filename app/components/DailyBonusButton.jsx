@@ -35,7 +35,7 @@ const DailyBonusButton = ({ size = 'normal', className = '' }) => {
     }
   }, [dailyBonusAvailable, getTimeUntilNextBonus]);
 
-  const handleClaimBonus = async () => {
+  const handleClaimBonus = () => {
     const result = claimDailyBonus();
     
     if (result.success) {

@@ -4,6 +4,9 @@ import { useUser } from '@clerk/nextjs';
 import dynamicMatchSystem from '../lib/dynamicMatchSystem';
 
 const CompleteDynamicAdminPanel = () => {
+  // 🏷️ VERSION STAMP - Force cache refresh
+  console.log('🎯 ADMIN PANEL VERSION: 2025-01-12-FIXED-DELETE-ERROR');
+  
   const { user, isLoaded } = useUser();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,8 +144,11 @@ const CompleteDynamicAdminPanel = () => {
     }
   };
 
-  // Delete match
+  // Delete match with automatic frontend refresh
   const deleteMatch = async (matchId, force = false) => {
+    // 🔍 DEBUG: Verify we're using the fixed version
+    console.log('🗑️ DELETE FUNCTION VERSION: FIXED-2025-01-12');
+    
     const match = matches.find(m => m.id === matchId);
     const matchName = match ? `${match.wrestler1} vs ${match.wrestler2}` : 'this match';
     
@@ -157,54 +163,147 @@ const CompleteDynamicAdminPanel = () => {
         method: 'DELETE'
       });
 
-      const result = await response.json();
+      // Handle both successful and error responses
+      let result;
+      try {
+        result = await response.json();
+        console.log('📦 DELETE API RESPONSE:', { status: response.status, result });
+      } catch (jsonError) {
+        console.error('❌ Error parsing response:', jsonError);
+        throw new Error('Invalid server response');
+      }
 
-      if (result.success) {
+      if (response.ok && result?.success) {
+        // 🔄 AUTOMATIC FRONTEND REFRESH - Remove match card from frontend
+        console.log('🗑️ Match deleted, refreshing frontend data...');
+        
+        // Refresh admin panel data
         await loadAllData();
-        alert(`Match deleted successfully${force ? ' (including all bets)' : ''}`);
-      } else if (result.requiresForce) {
+        
+        // 🎯 TRIGGER FRONTEND REFRESH - Notify all components to refresh
+        if (window.postMessage) {
+          window.postMessage({
+            type: 'WRESTLEBET_MATCH_DELETED',
+            matchId: matchId,
+            matchName: matchName
+          }, '*');
+        }
+        
+        // Dispatch custom event for frontend components
+        const refreshEvent = new CustomEvent('wrestlebet-refresh-matches', {
+          detail: { 
+            action: 'delete',
+            matchId: matchId,
+            matchName: matchName
+          }
+        });
+        window.dispatchEvent(refreshEvent);
+        
+        alert(`✅ Match deleted successfully${force ? ' (including all bets)' : ''}\n🔄 Frontend automatically refreshed`);
+      } else if (result?.requiresForce) {
         // Show detailed error with force delete option
-        const confirmMessage = `${result.error}\n\nMatch: ${matchName}\nBets: ${result.betDetails.count}\nTotal WC: ${result.betDetails.totalAmount}\n\nWould you like to FORCE DELETE this match and ALL its bets? This cannot be undone!`;
+        const confirmMessage = `${result.error}\n\nMatch: ${matchName}\nBets: ${result.betDetails?.count || 'Unknown'}\nTotal WC: ${result.betDetails?.totalAmount || 'Unknown'}\n\nWould you like to FORCE DELETE this match and ALL its bets? This cannot be undone!`;
         
         if (confirm(confirmMessage)) {
           // Recursive call with force = true
           await deleteMatch(matchId, true);
         }
       } else {
-        throw new Error(result.error);
+        // Handle other error cases
+        const errorMessage = result?.error || `Server error: ${response.status} ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
     } catch (err) {
       console.error('❌ Error deleting match:', err);
-      alert(`Error deleting match: ${err.message}`);
+      alert(`❌ Error deleting match: ${err.message}`);
     }
   };
 
-  // Declare winner
+  // Declare winner with automatic match removal after payout
   const declareWinner = async (matchId, winner) => {
+    const match = matches.find(m => m.id === matchId);
+    const matchName = match ? `${match.wrestler1} vs ${match.wrestler2}` : 'this match';
+    
+    if (!confirm(`🏆 Declare ${winner} as the winner of ${matchName}?\n\nThis will:\n✅ Process all payouts\n🗑️ Remove match card from frontend\n🔒 Mark match as completed`)) {
+      return;
+    }
+
     try {
+      console.log(`🏆 Declaring winner: ${winner} for match ${matchId}`);
+      
       const response = await fetch('/api/admin/declare-winner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           matchId,
           winner,
+          adminKey: 'wrestlebet-admin-2025', // Use admin key for API
           adminUserId: user?.id
         })
       });
 
-      const result = await response.json();
+      // Handle both successful and error responses
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Error parsing winner declaration response:', jsonError);
+        throw new Error('Invalid server response from winner declaration API');
+      }
 
-      if (result.success) {
+      if (response.ok && result?.success) {
+        console.log('✅ Winner declared successfully:', result);
+        
+        // 🔄 AUTOMATIC FRONTEND REFRESH - Remove completed match card
+        console.log('🏆 Winner declared, processing payouts and removing match card...');
+        
+        // Refresh admin panel data
         await loadAllData();
-        alert(`Winner declared: ${winner}`);
+        
+        // 🎯 TRIGGER FRONTEND REFRESH - Notify all components to refresh
+        if (window.postMessage) {
+          window.postMessage({
+            type: 'WRESTLEBET_WINNER_DECLARED',
+            matchId: matchId,
+            winner: winner,
+            matchName: matchName,
+            payoutResults: result.payoutResults || [],
+            summary: result.summary || {}
+          }, '*');
+        }
+        
+        // Dispatch custom event for frontend components
+        const refreshEvent = new CustomEvent('wrestlebet-refresh-matches', {
+          detail: { 
+            action: 'winner_declared',
+            matchId: matchId,
+            winner: winner,
+            matchName: matchName,
+            completed: true
+          }
+        });
+        window.dispatchEvent(refreshEvent);
+        
+        // Show detailed success message
+        const successMessage = `🏆 Winner declared: ${winner}\n\n📊 Payout Summary:\n` +
+          `• Total Bets: ${result.totalBets || 0}\n` +
+          `• Winners: ${result.summary?.winners || 0}\n` +
+          `• Losers: ${result.summary?.losers || 0}\n` +
+          `• Total Paid Out: ${result.summary?.totalPaidOut || 0} WC\n` +
+          `• House Edge: ${result.summary?.houseEdge || 0} WC\n\n` +
+          `✅ Match card automatically removed from frontend`;
+          
+        alert(successMessage);
       } else {
-        throw new Error(result.error);
+        // Handle error response
+        const errorMessage = result?.error || `Server error: ${response.status} ${response.statusText}`;
+        throw new Error(errorMessage);
       }
 
     } catch (err) {
       console.error('❌ Error declaring winner:', err);
-      alert(`Error declaring winner: ${err.message}`);
+      alert(`❌ Error declaring winner: ${err.message}`);
     }
   };
 

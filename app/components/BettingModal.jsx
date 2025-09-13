@@ -4,9 +4,12 @@ import React, { useState } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext';
 
 const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet, onConfirmBet }) => {
+  console.log('🪟 BettingModal rendered:', { isOpen, matchId, wrestler, odds, hasOnPlaceBet: !!onPlaceBet });
+  
   const { balance, getFormattedBalance, canAffordBet } = useCurrency();
   const [betAmount, setBetAmount] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAmountChange = (e) => {
     const value = e.target.value;
@@ -25,17 +28,43 @@ const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet, on
 
   const handleSubmit = () => {
     const amount = parseFloat(betAmount);
+    console.log('🎯 BettingModal handleSubmit:', { amount, betAmount, matchId, wrestler, odds });
+    
     if (!amount || amount < 10 || !canAffordBet(amount)) {
+      console.log('❌ Submit blocked:', { amount, minAmount: amount >= 10, canAfford: canAffordBet(amount) });
       return;
     }
 
-    const submitHandler = onPlaceBet || onConfirmBet;
-    if (typeof submitHandler === 'function') {
-      submitHandler(amount);
-    }
-    setBetAmount('');
+    setIsSubmitting(true);
     setError('');
-    onClose();
+
+    const submitHandler = onPlaceBet || onConfirmBet;
+    console.log('🎯 Calling submit handler:', { hasHandler: !!submitHandler, handlerType: typeof submitHandler });
+    
+    if (typeof submitHandler === 'function') {
+      // Call with all required parameters for placeBetFromVote
+      console.log('✅ Calling submitHandler with:', matchId, wrestler, amount, odds);
+      
+      // Handle the promise without async/await
+      submitHandler(matchId, wrestler, amount, odds)
+        .then((result) => {
+          // Success - close modal
+          setBetAmount('');
+          setError('');
+          onClose();
+        })
+        .catch((error) => {
+          console.error('❌ Betting error:', error);
+          setError(error.message || 'Failed to place bet');
+        })
+        .finally(() => {
+          setIsSubmitting(false);
+        });
+    } else {
+      console.error('❌ No valid submit handler found');
+      setError('No betting handler available');
+      setIsSubmitting(false);
+    }
   };
 
   const handleQuickBet = (amount) => {
@@ -129,14 +158,14 @@ const BettingModal = ({ isOpen, onClose, matchId, wrestler, odds, onPlaceBet, on
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors touch-manipulation min-h-[44px] ${
-              canSubmit
+              canSubmit && !isSubmitting
                 ? 'bg-yellow-400 text-black hover:bg-yellow-500 active:bg-yellow-600'
                 : 'bg-gray-600 text-gray-400 cursor-not-allowed'
             }`}
           >
-            Place Bet
+            {isSubmitting ? 'Placing Bet...' : 'Place Bet'}
           </button>
         </div>
       </div>

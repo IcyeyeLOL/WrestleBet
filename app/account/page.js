@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useUser } from '@clerk/nextjs';
 
 export default function Account() {
@@ -53,6 +54,14 @@ export default function Account() {
   }
 
   // Only import and render AccountPage when user is authenticated
-  const AccountPage = require('../components/AccountPage').default;
-  return <AccountPage />;
+  const AccountPage = React.lazy(() => import('../components/AccountPage'));
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-black flex items-center justify-center">
+        <div className="text-white text-lg">Loading account...</div>
+      </div>
+    }>
+      <AccountPage />
+    </React.Suspense>
+  );
 }

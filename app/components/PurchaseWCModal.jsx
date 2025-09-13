@@ -35,7 +35,7 @@ const PaymentForm = ({ selectedPackage, onSuccess, onError }) => {
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
 
     if (!stripe || !elements || !selectedPackage) {
@@ -44,21 +44,20 @@ const PaymentForm = ({ selectedPackage, onSuccess, onError }) => {
 
     setProcessing(true);
 
-    try {
-      // Test with Stripe's test mode
-      console.log('🔧 Testing Stripe with package:', selectedPackage);
-      
-      // Create a test payment method for demonstration
-      const cardElement = elements.getElement(CardElement);
-      
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          name: 'Test User',
-        },
-      });
-
+    // Test with Stripe's test mode
+    console.log('🔧 Testing Stripe with package:', selectedPackage);
+    
+    // Create a test payment method for demonstration
+    const cardElement = elements.getElement(CardElement);
+    
+    stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        name: 'Test User',
+      },
+    })
+    .then(({ error, paymentMethod }) => {
       if (error) {
         throw new Error(error.message);
       }
@@ -68,13 +67,14 @@ const PaymentForm = ({ selectedPackage, onSuccess, onError }) => {
       // For testing purposes, we'll simulate success
       // In production, you would create a payment intent on your server
       onSuccess(selectedPackage);
-      
-    } catch (err) {
+    })
+    .catch(err => {
       console.error('❌ Payment failed:', err);
       onError(err.message || 'Payment failed');
-    } finally {
+    })
+    .finally(() => {
       setProcessing(false);
-    }
+    });
   };
 
   return (

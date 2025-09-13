@@ -2,14 +2,26 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AdminLayout from '../components/AdminLayout';
-import AdminMatchControl from '../components/AdminMatchControl';
+import AdminMatchControlWrapper from '../components/AdminMatchControlWrapper';
 import AdminUsers from '../components/AdminUsers';
 import AdminAnalytics from '../components/AdminAnalytics';
 import AdminSettings from '../components/AdminSettings';
+import PayoutAdmin from './payouts/page';
 
 export default function AdminPage() {
   const [activePage, setActivePage] = useState('dashboard');
+  const router = useRouter();
+
+  const handleGoHome = () => {
+    // Clear admin access and navigate home
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('wrestlebet_admin_access');
+    }
+    // Use window.location.href for immediate navigation
+    window.location.href = '/';
+  };
 
   return (
     <AdminLayout currentPage="dashboard">
@@ -21,18 +33,18 @@ export default function AdminPage() {
                 <h1 className="text-4xl font-bold text-white">🛡️ Admin Panel</h1>
                 <p className="text-gray-300 mt-2">Manage matches, users, analytics, and system settings</p>
               </div>
-              <Link 
-                href="/" 
+              <button 
+                onClick={handleGoHome}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center space-x-2"
               >
                 <span>🏠</span>
                 <span>Go Home</span>
-              </Link>
+              </button>
             </div>
           </div>
           
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-8">
               <button 
                 onClick={() => setActivePage('matches')}
                 className={`px-4 py-3 rounded-lg text-left transition-colors ${activePage==='matches' ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
@@ -52,6 +64,12 @@ export default function AdminPage() {
                 👥 Users
               </button>
               <button 
+                onClick={() => setActivePage('payouts')}
+                className={`px-4 py-3 rounded-lg text-left transition-colors ${activePage==='payouts' ? 'bg-yellow-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              >
+                🏆 Payouts
+              </button>
+              <button 
                 onClick={() => setActivePage('settings')}
                 className={`px-4 py-3 rounded-lg text-left transition-colors ${activePage==='settings' ? 'bg-gray-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
               >
@@ -60,9 +78,10 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-8">
-              {activePage === 'matches' && <AdminMatchControl />}
+              {activePage === 'matches' && <AdminMatchControlWrapper />}
               {activePage === 'analytics' && <AdminAnalytics />}
               {activePage === 'users' && <AdminUsers />}
+              {activePage === 'payouts' && <PayoutAdmin />}
               {activePage === 'settings' && <AdminSettings />}
               {activePage === 'dashboard' && (
                 <div className="text-white text-center py-12">

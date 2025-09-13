@@ -106,12 +106,14 @@ const AccountPage = () => {
   };
 
   // Handle sign out
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Sign out failed:', error);
-    }
+  const handleSignOut = () => {
+    signOut()
+      .then(() => {
+        console.log('Signed out successfully');
+      })
+      .catch(error => {
+        console.error('Sign out failed:', error);
+      });
   };
 
   // Get recent transactions for wallet display

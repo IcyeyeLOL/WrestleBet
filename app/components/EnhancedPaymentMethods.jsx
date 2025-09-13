@@ -37,7 +37,7 @@ const AddPaymentMethodForm = ({ onSuccess, onCancel }) => {
   const [error, setError] = useState('');
   const [holderName, setHolderName] = useState('');
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
 
     if (!stripe || !elements) {
@@ -53,18 +53,17 @@ const AddPaymentMethodForm = ({ onSuccess, onCancel }) => {
     setProcessing(true);
     setError('');
 
-    try {
-      const cardElement = elements.getElement(CardElement);
+    const cardElement = elements.getElement(CardElement);
 
-      // Create payment method with Stripe
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          name: holderName.trim(),
-        },
-      });
-
+    // Create payment method with Stripe
+    stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        name: holderName.trim(),
+      },
+    })
+    .then(({ error, paymentMethod }) => {
       if (error) {
         throw new Error(error.message);
       }
@@ -83,13 +82,14 @@ const AddPaymentMethodForm = ({ onSuccess, onCancel }) => {
 
       console.log('✅ Payment method created successfully:', paymentMethod);
       onSuccess(newPaymentMethod);
-      
-    } catch (err) {
+    })
+    .catch(err => {
       console.error('❌ Error creating payment method:', err);
       setError(err.message || 'Failed to add payment method');
-    } finally {
+    })
+    .finally(() => {
       setProcessing(false);
-    }
+    });
   };
 
   return (
@@ -172,23 +172,18 @@ const PaymentMethodsContent = () => {
     loadPaymentMethods();
   }, []);
 
-  const loadPaymentMethods = async () => {
-    try {
-      setLoading(true);
-      
-      // In a real app, fetch from your API
-      // const response = await fetch('/api/payments/methods');
-      // const methods = await response.json();
-      
-      // Start with empty payment methods (removed John Doe sample)
-      const mockMethods = [];
-      
-      setPaymentMethods(mockMethods);
-    } catch (error) {
-      console.error('Error loading payment methods:', error);
-    } finally {
-      setLoading(false);
-    }
+  const loadPaymentMethods = () => {
+    setLoading(true);
+    
+    // In a real app, fetch from your API
+    // const response = await fetch('/api/payments/methods');
+    // const methods = await response.json();
+    
+    // Start with empty payment methods (removed John Doe sample)
+    const mockMethods = [];
+    
+    setPaymentMethods(mockMethods);
+    setLoading(false);
   };
 
   const handleAddSuccess = (newMethod) => {
@@ -196,33 +191,23 @@ const PaymentMethodsContent = () => {
     setShowAddForm(false);
   };
 
-  const handleDeleteMethod = async (methodId) => {
+  const handleDeleteMethod = (methodId) => {
     if (window.confirm('Are you sure you want to delete this payment method?')) {
-      try {
-        // In a real app, delete from your API
-        // await fetch(`/api/payments/methods/${methodId}`, { method: 'DELETE' });
-        
-        setPaymentMethods(prev => prev.filter(method => method.id !== methodId));
-      } catch (error) {
-        console.error('Error deleting payment method:', error);
-        alert('Failed to delete payment method');
-      }
+      // In a real app, delete from your API
+      // await fetch(`/api/payments/methods/${methodId}`, { method: 'DELETE' });
+      
+      setPaymentMethods(prev => prev.filter(method => method.id !== methodId));
     }
   };
 
-  const handleSetDefault = async (methodId) => {
-    try {
-      // In a real app, update via your API
-      // await fetch(`/api/payments/methods/${methodId}/set-default`, { method: 'POST' });
-      
-      setPaymentMethods(prev => prev.map(method => ({
-        ...method,
-        isDefault: method.id === methodId
-      })));
-    } catch (error) {
-      console.error('Error setting default payment method:', error);
-      alert('Failed to set default payment method');
-    }
+  const handleSetDefault = (methodId) => {
+    // In a real app, update via your API
+    // await fetch(`/api/payments/methods/${methodId}/set-default`, { method: 'POST' });
+    
+    setPaymentMethods(prev => prev.map(method => ({
+      ...method,
+      isDefault: method.id === methodId
+    })));
   };
 
   const getCardIcon = (type) => {

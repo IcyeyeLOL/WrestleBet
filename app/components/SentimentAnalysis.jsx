@@ -76,29 +76,53 @@ const SentimentAnalysis = ({
   // Get colors for both wrestlers
   const wrestler1Colors = getGradientColors(colors.wrestler1);
   const wrestler2Colors = getGradientColors(colors.wrestler2);
+  
+  // Dynamic colors based on betting percentages - optimized
+  const getDynamicColors = (maxPercentage) => {
+    if (maxPercentage >= 60) {
+      return {
+        wrestler1: { from: '#00ff88', to: '#00cc6a' }, // Bright green
+        wrestler2: { from: '#ff4757', to: '#ff3742' }   // Bright red
+      };
+    } else if (maxPercentage >= 40) {
+      return {
+        wrestler1: { from: '#3b82f6', to: '#2563eb' }, // Blue
+        wrestler2: { from: '#ef4444', to: '#dc2626' }   // Red
+      };
+    } else {
+      return {
+        wrestler1: { from: '#8b5cf6', to: '#7c3aed' }, // Purple
+        wrestler2: { from: '#f59e0b', to: '#d97706' }   // Orange
+      };
+    }
+  };
 
   const wrestler1Key = getWrestlerKey(wrestler1);
   const wrestler2Key = getWrestlerKey(wrestler2);
   
-  const wrestler1Percentage = getPercentage(matchId, wrestler1Key);
-  const wrestler2Percentage = getPercentage(matchId, wrestler2Key);
+  // Use 'wrestler1' and 'wrestler2' as keys for getPercentage function
+  let wrestler1Percentage = getPercentage(matchId, 'wrestler1');
+  let wrestler2Percentage = getPercentage(matchId, 'wrestler2');
   
-  // Debug logging
-  console.log(`🎨 SentimentAnalysis for ${matchId}:`, {
-    wrestler1: wrestler1,
-    wrestler2: wrestler2,
-    wrestler1Key,
-    wrestler2Key,
-    wrestler1Percentage,
-    wrestler2Percentage,
-    totalWC: getTotalWCInPool(matchId),
-    wrestler1Colors,
-    wrestler2Colors,
-    gradientClasses: {
-      wrestler1: colors.wrestler1,
-      wrestler2: colors.wrestler2
+  // Normalize percentages to ensure they add up to 100%
+  const totalPercentage = wrestler1Percentage + wrestler2Percentage;
+  if (totalPercentage > 0) {
+    wrestler1Percentage = Math.round((wrestler1Percentage / totalPercentage) * 100);
+    wrestler2Percentage = Math.round((wrestler2Percentage / totalPercentage) * 100);
+    
+    // Ensure they add up to exactly 100%
+    const actualTotal = wrestler1Percentage + wrestler2Percentage;
+    if (actualTotal !== 100) {
+      wrestler2Percentage = 100 - wrestler1Percentage;
     }
-  });
+  } else {
+    // Default to 50-50 if no data
+    wrestler1Percentage = 50;
+    wrestler2Percentage = 50;
+  }
+
+  // Calculate dynamic colors AFTER percentages are defined
+  const dynamicColors = getDynamicColors(Math.max(wrestler1Percentage, wrestler2Percentage));
 
   return (
     <div className="mt-6 pt-6 border-t border-slate-600/30 group-hover:border-yellow-400/30 transition-colors">
@@ -122,15 +146,25 @@ const SentimentAnalysis = ({
       </div>
       
       {/* Sentiment Bar */}
-      <div className="relative mb-4 h-4 md:h-5 rounded-full overflow-hidden bg-slate-800/50 border border-slate-700/50 shadow-inner">
-        {/* Wrestler 1 Bar */}
+      <div className="relative mb-4 h-8 md:h-10 rounded-full overflow-hidden bg-slate-800/50 border-2 border-slate-700/50 shadow-inner">
+        {/* Background fill to ensure no gaps */}
         <div 
-          className="h-full transition-all duration-500 ease-out flex items-center justify-center"
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to right, ${dynamicColors.wrestler1.from} ${wrestler1Percentage}%, ${dynamicColors.wrestler2.from} ${wrestler1Percentage}%)`
+          }}
+        ></div>
+        
+        {/* Wrestler 1 Bar - Left side */}
+        <div 
+          className="absolute top-0 left-0 h-full transition-all duration-500 ease-out flex items-center justify-center"
           style={{ 
-            width: `${Math.max(wrestler1Percentage, 2)}%`,
-            background: `${wrestler1Colors.from}`,
-            boxShadow: `0 0 8px ${wrestler1Colors.from}40`,
-            minWidth: wrestler1Percentage > 0 ? '8px' : '0px'
+            width: `${wrestler1Percentage}%`,
+            background: `${dynamicColors.wrestler1.from}`,
+            boxShadow: `0 0 12px ${dynamicColors.wrestler1.from}60`,
+            minWidth: wrestler1Percentage > 0 ? '8px' : '0px',
+            zIndex: 10,
+            borderRadius: '9999px 0 0 9999px'
           }}
         >
           {wrestler1Percentage > 15 && (
@@ -139,15 +173,18 @@ const SentimentAnalysis = ({
             </span>
           )}
         </div>
-        {/* Wrestler 2 Bar */}
+        
+        {/* Wrestler 2 Bar - Right side */}
         <div 
           className="absolute top-0 h-full transition-all duration-500 ease-out flex items-center justify-center"
           style={{ 
-            width: `${Math.max(wrestler2Percentage, 2)}%`,
-            background: `${wrestler2Colors.from}`,
-            boxShadow: `0 0 8px ${wrestler2Colors.from}40`,
-            right: 0,
-            minWidth: wrestler2Percentage > 0 ? '8px' : '0px'
+            left: `${wrestler1Percentage}%`,
+            width: `${wrestler2Percentage}%`,
+            background: `${dynamicColors.wrestler2.from}`,
+            boxShadow: `0 0 12px ${dynamicColors.wrestler2.from}60`,
+            minWidth: wrestler2Percentage > 0 ? '8px' : '0px',
+            zIndex: 10,
+            borderRadius: '0 9999px 9999px 0'
           }}
         >
           {wrestler2Percentage > 15 && (
@@ -156,6 +193,7 @@ const SentimentAnalysis = ({
             </span>
           )}
         </div>
+        
         {/* Center divider line for 50-50 */}
         {wrestler1Percentage === 50 && wrestler2Percentage === 50 && (
           <div 
@@ -163,6 +201,7 @@ const SentimentAnalysis = ({
             style={{ left: '50%', transform: 'translateX(-50%)' }}
           ></div>
         )}
+        
         {/* Fallback: Show empty state if no percentages */}
         {wrestler1Percentage === 0 && wrestler2Percentage === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -176,14 +215,14 @@ const SentimentAnalysis = ({
         <div 
           className="flex items-center gap-2 rounded-lg px-3 py-2 border"
           style={{
-            backgroundColor: `${wrestler1Colors.from}20`,
-            borderColor: `${wrestler1Colors.from}50`
+            backgroundColor: `${dynamicColors.wrestler1.from}20`,
+            borderColor: `${dynamicColors.wrestler1.from}50`
           }}
         >
           <span 
             className="w-3 h-3 rounded-full shadow-lg"
             style={{
-              background: `${wrestler1Colors.from}`
+              background: `${dynamicColors.wrestler1.from}`
             }}
           ></span>
           <span className="text-slate-300 font-medium">{typeof wrestler1 === 'string' && wrestler1 ? wrestler1.split(' ')[0] : 'Wrestler 1'}</span>
@@ -194,14 +233,14 @@ const SentimentAnalysis = ({
         <div 
           className="flex items-center gap-2 rounded-lg px-3 py-2 border"
           style={{
-            backgroundColor: `${wrestler2Colors.from}20`,
-            borderColor: `${wrestler2Colors.from}50`
+            backgroundColor: `${dynamicColors.wrestler2.from}20`,
+            borderColor: `${dynamicColors.wrestler2.from}50`
           }}
         >
           <span 
             className="w-3 h-3 rounded-full shadow-lg"
             style={{
-              background: `${wrestler2Colors.from}`
+              background: `${dynamicColors.wrestler2.from}`
             }}
           ></span>
           <span className="text-slate-300 font-medium">{typeof wrestler2 === 'string' && wrestler2 ? wrestler2.split(' ')[0] : 'Wrestler 2'}</span>

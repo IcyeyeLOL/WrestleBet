@@ -5,30 +5,32 @@ import React, { useState } from 'react';
 const SubscriptionSuccess = ({ donation, onClose }) => {
   const [isPortalLoading, setIsPortalLoading] = useState(false);
 
-  const openCustomerPortal = async () => {
+  const openCustomerPortal = () => {
     setIsPortalLoading(true);
-    try {
-      const response = await fetch('/api/donations/customer-portal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-        body: JSON.stringify({
-          customerId: donation.customerId,
-          returnUrl: window.location.href
-        }),
-      });
-
-      const { url } = await response.json();
+    
+    fetch('/api/donations/customer-portal', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      body: JSON.stringify({
+        customerId: donation.customerId,
+        returnUrl: window.location.href
+      }),
+    })
+    .then(response => response.json())
+    .then(({ url }) => {
       if (url) {
         window.open(url, '_blank');
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Error opening customer portal:', error);
-    } finally {
+    })
+    .finally(() => {
       setIsPortalLoading(false);
-    }
+    });
   };
 
   const formatAmount = (amount) => {

@@ -86,11 +86,11 @@ export async function GET(request) {
     }
 
     if (matchId) {
-      // Get votes for specific match
+      // Get votes for specific match with optimized query
       const { data: votes, error } = await supabase
         .from('votes')
         .select('wrestler_choice')
-        .eq('match_id', matchId)
+        .eq('match_id', matchId.toString())
 
       if (error) throw error
 
@@ -106,7 +106,7 @@ export async function GET(request) {
         totalVotes: votes.length
       })
     } else {
-      // Get all matches with vote counts
+      // Get all matches without relationship queries to avoid 404 errors
       const { data: matches, error: matchesError } = await supabase
         .from('matches')
         .select('*')
@@ -115,7 +115,7 @@ export async function GET(request) {
 
       if (matchesError) throw matchesError
 
-      // Get all votes for all matches
+      // Get all votes separately to avoid relationship issues
       const { data: allVotes, error: votesError } = await supabase
         .from('votes')
         .select('match_id, wrestler_choice')
@@ -124,7 +124,6 @@ export async function GET(request) {
 
       // Process matches with vote counts
       const matchesWithVotes = matches.map(match => {
-        // Filter votes for this specific match
         const matchVotes = allVotes.filter(vote => vote.match_id === match.id);
         
         const voteCounts = matchVotes.reduce((acc, vote) => {

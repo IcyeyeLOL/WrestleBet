@@ -11,18 +11,22 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
   const [adminAccess, setAdminAccess] = useState(false);
   const [adminKeyInput, setAdminKeyInput] = useState('');
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Admin key for access
   const ADMIN_KEY = 'wrestlebet-admin-2025';
 
   // Check if user has admin access
-  const isAdmin = isSignedIn && (
+  const isAdmin = (
     adminAccess ||
-    user?.emailAddresses?.[0]?.emailAddress === 'admin@wrestlebet.com' ||
-    user?.publicMetadata?.role === 'admin' ||
-    user?.username === 'admin' ||
-    user?.firstName === 'Kunle' || // Added your user
-    user?.username === 'Kunle' ||  // Alternative check
+    (isSignedIn && (
+      user?.emailAddresses?.[0]?.emailAddress === 'admin@wrestlebet.com' ||
+      user?.publicMetadata?.role === 'admin' ||
+      user?.username === 'admin' ||
+      user?.firstName === 'Kunle' || // Added your user
+      user?.username === 'Kunle' ||  // Alternative check
+      localStorage.getItem('wrestlebet_admin_access') === 'true'
+    )) ||
     localStorage.getItem('wrestlebet_admin_access') === 'true'
   );
 
@@ -46,10 +50,19 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
   };
 
   useEffect(() => {
-    if (isLoaded && !isAdmin) {
-      router.push('/');
+    // Only redirect if we're not already navigating away and not in key input mode
+    // AND if we're not in the middle of checking admin access
+    if (isLoaded && !isAdmin && !showKeyInput && !isNavigating) {
+      // Add a longer delay to prevent conflicts with user-initiated navigation
+      const timer = setTimeout(() => {
+        // Only redirect if we're still not admin and not in key input mode
+        if (!adminAccess && !showKeyInput && !isNavigating) {
+          router.push('/');
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isLoaded, isAdmin, router]);
+  }, [isLoaded, isAdmin, router, showKeyInput, isNavigating, adminAccess]);
 
   if (!isLoaded) {
     return (

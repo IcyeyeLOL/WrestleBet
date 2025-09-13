@@ -11,64 +11,62 @@ const DynamicMatchSystem = () => {
     loadMatches();
   }, []);
 
-  const loadMatches = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setMatches(data || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const loadMatches = () => {
+    setLoading(true);
+    
+    supabase
+      .from('matches')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        setMatches(data || []);
+      })
+      .catch(err => {
+        setError(err.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   // Create new match dynamically
-  const createMatch = async (matchData) => {
-    try {
-      const { data, error } = await supabase
-        .from('matches')
-        .insert([{
-          wrestler1: matchData.wrestler1,
-          wrestler2: matchData.wrestler2,
-          event_name: matchData.eventName,
-          weight_class: matchData.weightClass,
-          status: 'active',
-          created_at: new Date().toISOString()
-        }])
-        .select();
-
-      if (error) throw error;
-      
-      await loadMatches(); // Refresh list
-      return data[0];
-    } catch (err) {
-      setError(err.message);
-    }
+  const createMatch = (matchData) => {
+    supabase
+      .from('matches')
+      .insert([{
+        wrestler1: matchData.wrestler1,
+        wrestler2: matchData.wrestler2,
+        event_name: matchData.eventName,
+        weight_class: matchData.weightClass,
+        status: 'active',
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        loadMatches(); // Refresh list
+        return data[0];
+      })
+      .catch(err => {
+        setError(err.message);
+      });
   };
 
   // Delete match
-  const deleteMatch = async (matchId) => {
-    try {
-      const { error } = await supabase
-        .from('matches')
-        .delete()
-        .eq('id', matchId);
-
-      if (error) throw error;
-      
-      await loadMatches(); // Refresh list
-    } catch (err) {
-      setError(err.message);
-    }
+  const deleteMatch = (matchId) => {
+    supabase
+      .from('matches')
+      .delete()
+      .eq('id', matchId)
+      .then(({ error }) => {
+        if (error) throw error;
+        loadMatches(); // Refresh list
+      })
+      .catch(err => {
+        setError(err.message);
+      });
   };
 
   if (loading) return <div>Loading matches...</div>;
@@ -128,3 +126,7 @@ const DynamicMatchSystem = () => {
 };
 
 export default DynamicMatchSystem;
+
+
+
+

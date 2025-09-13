@@ -95,20 +95,21 @@ const GlobalSyncSystem = () => {
   };
 
   // Register device for global sync
-  const registerDevice = async () => {
+  const registerDevice = () => {
     const deviceId = generateDeviceId();
-    const { error } = await supabase
+    supabase
       .from('user_devices')
       .insert([{
         device_id: deviceId,
         user_id: 'current_user', // Replace with actual user ID
         last_seen: new Date().toISOString(),
         is_active: true
-      }]);
-
-    if (!error) {
-      setSyncStatus('connected');
-    }
+      }])
+      .then(({ error }) => {
+        if (!error) {
+          setSyncStatus('connected');
+        }
+      });
   };
 
   // Generate unique device ID
@@ -117,19 +118,19 @@ const GlobalSyncSystem = () => {
   };
 
   // Load global matches
-  const loadGlobalMatches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setGlobalMatches(data || []);
-    } catch (err) {
-      console.error('Failed to load global matches:', err);
-    }
+  const loadGlobalMatches = () => {
+    supabase
+      .from('matches')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        setGlobalMatches(data || []);
+      })
+      .catch(err => {
+        console.error('Failed to load global matches:', err);
+      });
   };
 
   useEffect(() => {
@@ -161,3 +162,7 @@ const GlobalSyncSystem = () => {
 };
 
 export default GlobalSyncSystem;
+
+
+
+

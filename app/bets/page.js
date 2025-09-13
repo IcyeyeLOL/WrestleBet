@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useUser } from '@clerk/nextjs';
 
 export default function Bets() {
@@ -54,6 +55,14 @@ export default function Bets() {
   }
 
   // Only import and render BetsPage when user is authenticated
-  const BetsPage = require('../components/BetsPage.jsx').default;
-  return <BetsPage />;
+  const BetsPage = React.lazy(() => import('../components/BetsPage.jsx'));
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-black flex items-center justify-center">
+        <div className="text-white text-lg">Loading bets...</div>
+      </div>
+    }>
+      <BetsPage />
+    </React.Suspense>
+  );
 }

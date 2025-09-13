@@ -15,47 +15,48 @@ const AdminUsers = () => {
     loadUsers();
   }, [searchTerm, pagination.offset]);
 
-  const loadUsers = async () => {
+  const loadUsers = () => {
     setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        search: searchTerm,
-        limit: pagination.limit.toString(),
-        offset: pagination.offset.toString()
-      });
+    const params = new URLSearchParams({
+      search: searchTerm,
+      limit: pagination.limit.toString(),
+      offset: pagination.offset.toString()
+    });
 
-      const response = await fetch(`/api/admin/users?${params}`, {
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
-      const data = await response.json();
+    fetch(`/api/admin/users?${params}`, {
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         setUsers(data.users);
         setPagination(prev => ({ ...prev, ...data.pagination }));
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to load users:', error);
-    } finally {
+    })
+    .finally(() => {
       setLoading(false);
-    }
+    });
   };
 
-  const handleUserAction = async (userId, action, amount = 0, reason = '') => {
+  const handleUserAction = (userId, action, amount = 0, reason = '') => {
     setActionLoading(true);
-    try {
-      const response = await fetch('/api/admin/users', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-        body: JSON.stringify({
-          id: userId,
-          action,
-          amount,
-          reason,
-          adminUserId: 'admin-user-id' // This should come from auth context
-        })
-      });
-
-      const data = await response.json();
+    fetch('/api/admin/users', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+      body: JSON.stringify({
+        id: userId,
+        action,
+        amount,
+        reason,
+        adminUserId: 'admin-user-id' // This should come from auth context
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         // Update the user in the list
         setUsers(users.map(user => 
@@ -66,27 +67,28 @@ const AdminUsers = () => {
       } else {
         alert(`Error: ${data.error}`);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to perform user action:', error);
       alert('Failed to perform action');
-    } finally {
+    })
+    .finally(() => {
       setActionLoading(false);
-    }
+    });
   };
 
-  const handleDeleteUser = async (userId) => {
+  const handleDeleteUser = (userId) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
 
     setActionLoading(true);
-    try {
-      const response = await fetch(`/api/admin/users?id=${userId}&adminUserId=admin-user-id&confirm=true`, {
-        method: 'DELETE',
-        signal: AbortSignal.timeout(10000) // 10 second timeout
-      });
-
-      const data = await response.json();
+    fetch(`/api/admin/users?id=${userId}&adminUserId=admin-user-id&confirm=true`, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    })
+    .then(response => response.json())
+    .then(data => {
       if (data.success) {
         setUsers(users.filter(user => user.id !== userId));
         setShowUserModal(false);
@@ -94,12 +96,14 @@ const AdminUsers = () => {
       } else {
         alert(`Error: ${data.error}`);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to delete user:', error);
       alert('Failed to delete user');
-    } finally {
+    })
+    .finally(() => {
       setActionLoading(false);
-    }
+    });
   };
 
   const UserModal = ({ user, onClose }) => {
