@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '../components/AdminLayout';
@@ -12,16 +12,33 @@ import PayoutAdmin from './payouts/page';
 
 export default function AdminPage() {
   const [activePage, setActivePage] = useState('dashboard');
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleGoHome = () => {
     // Clear admin access and navigate home
     if (typeof window !== 'undefined') {
       localStorage.removeItem('wrestlebet_admin_access');
+      // Use window.location.href for immediate navigation
+      window.location.href = '/';
     }
-    // Use window.location.href for immediate navigation
-    window.location.href = '/';
   };
+
+  // Show loading state during hydration
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400 mx-auto mb-4"></div>
+          <p className="text-yellow-400">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AdminLayout currentPage="dashboard">

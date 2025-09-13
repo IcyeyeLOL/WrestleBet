@@ -12,12 +12,13 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
   const [adminKeyInput, setAdminKeyInput] = useState('');
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // Admin key for access
   const ADMIN_KEY = 'wrestlebet-admin-2025';
 
-  // Check if user has admin access
-  const isAdmin = (
+  // Check if user has admin access (only on client side)
+  const isAdmin = isClient && (
     adminAccess ||
     (isSignedIn && (
       user?.emailAddresses?.[0]?.emailAddress === 'admin@wrestlebet.com' ||
@@ -31,8 +32,9 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
   );
 
   useEffect(() => {
+    setIsClient(true);
     // Check localStorage for saved admin access
-    if (localStorage.getItem('wrestlebet_admin_access') === 'true') {
+    if (typeof window !== 'undefined' && localStorage.getItem('wrestlebet_admin_access') === 'true') {
       setAdminAccess(true);
     }
   }, []);
@@ -41,7 +43,9 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
     e.preventDefault();
     if (adminKeyInput === ADMIN_KEY) {
       setAdminAccess(true);
-      localStorage.setItem('wrestlebet_admin_access', 'true');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('wrestlebet_admin_access', 'true');
+      }
       setShowKeyInput(false);
       setAdminKeyInput('');
     } else {
@@ -198,7 +202,9 @@ const AdminLayout = ({ children, currentPage = 'dashboard' }) => {
               </div>
               <button
                 onClick={() => {
-                  localStorage.removeItem('wrestlebet_admin_access');
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('wrestlebet_admin_access');
+                  }
                   setAdminAccess(false);
                   router.push('/');
                 }}
