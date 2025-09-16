@@ -29,3 +29,4 @@ ORDER BY ordinal_position;
 SELECT 'Odds columns added successfully to matches table!' as message;
 
 
+

@@ -8,13 +8,13 @@ NODE_VERSION=20
 NODE_ENV=production
 
 # Your App Environment Variables
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
-CLERK_SECRET_KEY=sk_test_your_clerk_secret_key_here
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_bG9naWNhbC1ncmFja2xlLTUuY2xlcmsuYWNjb3VudHMuZGV2JA
+CLERK_SECRET_KEY=••••••••••••••••••••••••••••••••••••••••••••••••••
+NEXT_PUBLIC_SUPABASE_URL=https://hpkxmotzidywoilooqpx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhwa3htb3R6aWR5d29pbG9vcXB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyODg2MzcsImV4cCI6MjA2OTg2NDYzN30.KbbrGQPzXcO3SBRvXk2ySdCzprNiUXCnQZdiQRgCuNc
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key_here
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51RtbMsKqhNp3MKa8IaCIZ2kTp8zZip44C5VpT4xyzo5hyuVBrYlVeFLrZXlAkwS3MesZ67CZWxtuwDUYtJqF72ny00hDfRNVTI
+STRIPE_SECRET_KEY=sk_test_51RtbMsKqhNp3MKa8IcQO8fZTN0nNyp2HrMmd1ZXxRxOlsrsqfSxr6dKSzlFHa8l4YRePS7UBAKrY57TQYtaXnNzH00zAfnwHy2
 STRIPE_WEBHOOK_SECRET=whsec_your_stripe_webhook_secret_here
 
 # Instructions:

@@ -6,7 +6,7 @@ import { safeFetch } from './safeFetch.js';
 class GlobalDataSync {
   constructor() {
     this.storageKey = 'wrestlebet_global_data';
-    this.syncInterval = 30000; // 30 seconds
+    this.syncInterval = 120000; // 2 minutes - reduced frequency to prevent constant API calls
     this.isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
     this.syncInProgress = false;
     

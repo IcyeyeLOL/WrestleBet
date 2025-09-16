@@ -245,7 +245,8 @@ const MatchesSection = React.memo(({
   getTotalWCInPool, 
   getThemeColors,
   isSignedIn, 
-  canAffordBet 
+  canAffordBet,
+  onOpenAuth
 }) => (
   <section className="py-20 px-4" style={{backgroundColor: '#3a3a5c'}}>
     <div className="max-w-6xl mx-auto">
@@ -253,9 +254,38 @@ const MatchesSection = React.memo(({
         Hot Matches This Week
       </h2>
       
-      {/* Active bets removed from front page - now only accessible in account section */}
-      
-      {matchesLoading ? (
+      {/* Login Required Message */}
+      {!isSignedIn ? (
+        <div className="max-w-2xl mx-auto p-8 bg-gradient-to-br from-yellow-400/10 to-orange-500/10 backdrop-blur-sm border border-yellow-400/30 rounded-2xl shadow-xl">
+          <div className="text-center">
+            <div className="text-8xl mb-6">🔐</div>
+            <h3 className="text-3xl font-bold text-yellow-400 mb-4">Sign In Required</h3>
+            <p className="text-gray-300 mb-6 text-lg">
+              You need to be signed in to view and participate in wrestling matches!
+            </p>
+            <p className="text-gray-400 mb-8">
+              Join WrestleBet to place bets, vote on matches, and track your WrestleCoin balance.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => onOpenAuth('signin')}
+                className="px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold rounded-xl hover:from-yellow-500 hover:to-orange-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => onOpenAuth('signup')}
+                className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              >
+                Sign Up
+              </button>
+            </div>
+            <div className="mt-6 text-sm text-gray-400">
+              <p>✨ Free to join • 🎯 Start with 1000 WrestleCoins • 🏆 Compete for prizes</p>
+            </div>
+          </div>
+        </div>
+      ) : matchesLoading ? (
         <LoadingSpinner />
       ) : dynamicMatches.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -516,6 +546,10 @@ const FrontPageOptimized = () => {
     contextHandleVote(matchId, wrestler);
   }, [isSignedIn, contextHandleVote]);
 
+  const handleOpenAuth = useCallback((mode) => {
+    setAuthModal({ isOpen: true, mode, triggeredBy: 'matches' });
+  }, []);
+
   return (
     <div className="bg-gradient-wrestlebet min-h-screen">
       <Navigation />
@@ -534,6 +568,7 @@ const FrontPageOptimized = () => {
         getThemeColors={utilityFunctions.getThemeColors}
         isSignedIn={isSignedIn}
         canAffordBet={canAffordBet}
+        onOpenAuth={handleOpenAuth}
       />
 
       {/* Modals */}

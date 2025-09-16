@@ -744,15 +744,15 @@ export const BettingProvider = ({ children }) => {
     
     loadInitialData();
 
-    // Start global data sync
-    globalDataSync.startAutoSync();
+    // Start global data sync - DISABLED to prevent constant API calls
+    // globalDataSync.startAutoSync();
 
     // Periodically refresh poll data to sync with admin updates
     const intervalId = setInterval(() => {
       if (isMounted) {
         loadPollData();
       }
-    }, 15000); // every 15s
+    }, 300000); // every 5 minutes - further reduced to prevent constant API calls
 
     // Listen for admin-created matches to refresh immediately
     const onAdminCreated = () => {

@@ -511,7 +511,7 @@ export const GlobalStateProvider = ({ children }) => {
       loadBalance();
     }
     
-  }, [isLoaded, user?.id, loadMatches, loadBets, loadBalance]);
+  }, [isLoaded, user?.id]); // Removed function dependencies to prevent constant re-runs
 
   // Set up real-time subscriptions
   useEffect(() => {

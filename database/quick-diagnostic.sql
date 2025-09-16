@@ -53,3 +53,4 @@ WHERE trigger_schema = 'public'
   AND trigger_name = 'update_pools_after_bet';
 
 
+

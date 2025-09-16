@@ -134,3 +134,4 @@ export const CURRENCY_NAME = APP_CONFIG.currency.name;
 export const CURRENCY_SYMBOL = APP_CONFIG.currency.symbol;
 export const STARTING_BALANCE = APP_CONFIG.currency.startingBalance;
 export const DAILY_BONUS = APP_CONFIG.currency.dailyBonus;
+
